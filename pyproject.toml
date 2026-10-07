@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "molfp"
+version = "0.2.0"
+description = "Interpretable molecular fingerprints with SHAP-driven chemical explanations"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+authors = [
+    {name = "Chanin Nantasenamat"},
+]
+keywords = [
+    "cheminformatics",
+    "molecular-fingerprints",
+    "drug-discovery",
+    "QSAR",
+    "RDKit",
+    "SHAP",
+    "interpretability",
+    "scikit-learn",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Chemistry",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+dependencies = [
+    "numpy>=1.22",
+    "rdkit>=2023.03",
+    "scikit-learn>=1.2",
+    "scipy>=1.9",
+    "joblib>=1.2",
+]
+
+[project.optional-dependencies]
+shap = ["shap>=0.42"]
+all = ["shap>=0.42"]
+dev = [
+    "pytest>=7.0",
+    "shap>=0.42",
+]
+
+[project.urls]
+Homepage = "https://github.com/dataprofessor/molfp"
+Repository = "https://github.com/dataprofessor/molfp"
+
+[tool.setuptools.packages.find]
+include = ["molfp*"]
+
+[tool.setuptools.package-data]
+molfp = ["data/*.txt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = [
+    "ignore::UserWarning",
+    "ignore::RuntimeWarning",
+    "ignore::DeprecationWarning",
+]
