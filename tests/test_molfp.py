@@ -33,9 +33,9 @@ ACTIVITIES = [4.5, 5.0, 7.2, 6.8, 3.1, 5.5]
 
 class TestCoreFingerprints:
 
-    def test_available_returns_13(self):
+    def test_available_returns_22(self):
         fps = molfp.available()
-        assert len(fps) == 13
+        assert len(fps) == 22
 
     @pytest.mark.parametrize("fp_name,expected_len", [
         ("maccs", 166),
@@ -897,8 +897,8 @@ class TestSklearnTransformers:
 
     # ── TRANSFORMERS registry ────────────────────────────────────────────────
 
-    def test_transformers_registry_has_all_13(self):
-        assert len(molfp.TRANSFORMERS) == 13
+    def test_transformers_registry_has_all_22(self):
+        assert len(molfp.TRANSFORMERS) == 22
 
     def test_transformers_registry_matches_fingerprints(self):
         assert set(molfp.TRANSFORMERS.keys()) == set(molfp.FINGERPRINTS.keys())
@@ -1369,6 +1369,198 @@ class TestDistance:
         b = np.array([1, 2, 0, 0, 1])
         sim = molfp.tanimoto(a, b)
         assert 0 <= sim <= 1
+
+
+# =============================================================================
+# 18. 3D FINGERPRINTS
+# =============================================================================
+
+class Test3DFingerprints:
+
+    @pytest.mark.parametrize("fp_name,expected_len", [
+        ("atompairs3d", 780),
+        ("atompairs3d_count", 780),
+        ("usr", 12),
+        ("usrcat", 60),
+        ("autocorr3d", 80),
+        ("rdf", 210),
+        ("morse", 224),
+        ("whim", 114),
+        ("getaway", 273),
+    ])
+    def test_3d_fp_length(self, fp_name, expected_len):
+        fn, n_bits, _ = molfp.get(fp_name)
+        fp = fn(ASPIRIN)
+        assert len(fp) == expected_len
+
+    def test_usr_returns_floats(self):
+        fp = molfp.usr(ASPIRIN)
+        assert isinstance(fp, list)
+        assert any(v != 0 and v != 1 for v in fp)
+
+    def test_usrcat_returns_floats(self):
+        fp = molfp.usrcat(ASPIRIN)
+        assert any(v != 0 and v != 1 for v in fp)
+
+    def test_rdf_returns_floats(self):
+        fp = molfp.rdf(ASPIRIN)
+        assert any(v != 0 and v != 1 for v in fp)
+
+    def test_atompairs3d_binary(self):
+        fp = molfp.atompairs3d(ASPIRIN)
+        assert all(v in (0, 1) for v in fp)
+
+    def test_atompairs3d_count_can_exceed_1(self):
+        fp = molfp.atompairs3d_count(ANTHRACENE)
+        assert any(v > 1 for v in fp)
+
+    def test_3d_differs_from_2d(self):
+        fp2d = molfp.atompairs2d(ASPIRIN)
+        fp3d = molfp.atompairs3d(ASPIRIN)
+        assert fp2d != fp3d
+
+    @pytest.mark.parametrize("fp_name,expected_shape", [
+        ("usr", (3, 12)),
+        ("usrcat", (3, 60)),
+        ("autocorr3d", (3, 80)),
+        ("rdf", (3, 210)),
+        ("morse", (3, 224)),
+        ("whim", (3, 114)),
+        ("getaway", (3, 273)),
+        ("atompairs3d", (3, 780)),
+        ("atompairs3d_count", (3, 780)),
+    ])
+    def test_3d_batch_shape(self, fp_name, expected_shape):
+        fps = molfp.compute_batch(SMILES_SET[:3], fp_name)
+        assert fps.shape == expected_shape
+
+    def test_3d_batch_dtype_float_for_descriptors(self):
+        fps = molfp.usr_batch(SMILES_SET[:3])
+        assert fps.dtype == np.float32
+
+    def test_3d_batch_dtype_int_for_atompairs(self):
+        fps = molfp.atompairs3d_batch(SMILES_SET[:3])
+        assert fps.dtype == np.int32
+
+    def test_batch_no_nan(self):
+        for fp_name in ["usr", "usrcat", "autocorr3d", "rdf", "morse", "whim", "getaway"]:
+            fps = molfp.compute_batch(SMILES_SET[:3], fp_name)
+            assert not np.any(np.isnan(fps)), f"{fp_name} contains NaN"
+
+    def test_3d_deterministic(self):
+        fp1 = molfp.usr(ASPIRIN)
+        fp2 = molfp.usr(ASPIRIN)
+        assert fp1 == fp2
+
+    def test_3d_different_molecules(self):
+        fp1 = molfp.usr(ETHANOL)
+        fp2 = molfp.usr(ANTHRACENE)
+        assert fp1 != fp2
+
+    def test_3d_list_input(self):
+        fps = molfp.usrcat(SMILES_SET[:3])
+        assert isinstance(fps, np.ndarray)
+        assert fps.shape == (3, 60)
+
+    def test_3d_dataframe_input(self):
+        import pandas as pd
+        df = pd.DataFrame({"SMILES": SMILES_SET[:3]})
+        fps = molfp.rdf(df)
+        assert fps.shape == (3, 210)
+
+    def test_3d_sparse(self):
+        from scipy.sparse import issparse
+        fps = molfp.morse(SMILES_SET[:3], sparse=True)
+        assert issparse(fps)
+        assert fps.shape == (3, 224)
+
+    def test_3d_transformers_exist(self):
+        for name in ["atompairs3d", "atompairs3d_count", "usr", "usrcat",
+                      "autocorr3d", "rdf", "morse", "whim", "getaway"]:
+            assert name in molfp.TRANSFORMERS
+
+    def test_3d_transformer_works(self):
+        t = molfp.get_transformer("usrcat")
+        X = t.fit_transform(SMILES_SET[:3])
+        assert X.shape == (3, 60)
+
+    def test_conformer_from_smiles(self):
+        fp = molfp.usr("C")  # methane — simplest molecule
+        assert len(fp) == 12
+        assert any(v != 0 for v in fp)
+
+
+# =============================================================================
+# 19. Visualization (viz module)
+# =============================================================================
+
+class TestVisualization:
+    """Tests for draw() and view3d()."""
+
+    def test_draw_single_returns_image(self):
+        img = molfp.draw("CCO")
+        from PIL import Image
+        assert isinstance(img, Image.Image)
+
+    def test_draw_single_custom_size(self):
+        img = molfp.draw("CCO", size=(400, 400))
+        assert img.size[0] == 400
+        assert img.size[1] == 400
+
+    def test_draw_batch_returns_image(self):
+        img = molfp.draw(["CCO", "c1ccccc1", "CC(=O)O"])
+        from PIL import Image
+        assert isinstance(img, Image.Image)
+
+    def test_draw_batch_with_legends(self):
+        img = molfp.draw(
+            ["CCO", "c1ccccc1"],
+            legends=["ethanol", "benzene"]
+        )
+        from PIL import Image
+        assert isinstance(img, Image.Image)
+
+    def test_draw_with_highlight_bits(self):
+        img = molfp.draw("c1ccccc1", highlight_bits=[0, 1], fp_type="maccs")
+        from PIL import Image
+        assert isinstance(img, Image.Image)
+
+    def test_draw_rdkit_mol_input(self):
+        from rdkit import Chem
+        mol = Chem.MolFromSmiles("CCO")
+        img = molfp.draw(mol)
+        from PIL import Image
+        assert isinstance(img, Image.Image)
+
+    def test_view3d_returns_html_in_script_mode(self):
+        try:
+            import py3Dmol
+        except ImportError:
+            pytest.skip("py3Dmol not installed")
+        result = molfp.view3d("CCO")
+        assert isinstance(result, str)
+        assert "3Dmol" in result or "viewer" in result.lower() or "<div" in result
+
+    def test_view3d_different_styles(self):
+        try:
+            import py3Dmol
+        except ImportError:
+            pytest.skip("py3Dmol not installed")
+        for style in ["stick", "sphere", "line", "ball_and_stick"]:
+            result = molfp.view3d("CCO", style=style)
+            assert isinstance(result, str)
+
+    def test_view3d_missing_py3dmol_error(self):
+        """view3d raises ImportError with install instructions if py3Dmol missing."""
+        try:
+            import py3Dmol
+            # py3Dmol is available — just verify view3d works
+            result = molfp.view3d("CCO")
+            assert result is not None
+        except ModuleNotFoundError:
+            # py3Dmol not installed — verify our error message
+            with pytest.raises(ImportError, match="pip install py3Dmol"):
+                molfp.view3d("CCO")
 
 
 # =============================================================================

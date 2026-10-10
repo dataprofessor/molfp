@@ -53,6 +53,16 @@ from .fingerprints import (
     rdk,
     rdk_ext,
     rdk_graphonly,
+    atompairs3d,
+    atompairs3d_count,
+    usr,
+    usrcat,
+    autocorr3d,
+    rdf,
+    morse,
+    whim,
+    getaway,
+    check_conformer,
     maccs_batch,
     ecfp4_batch,
     pubchem_batch,
@@ -66,6 +76,15 @@ from .fingerprints import (
     rdk_batch,
     rdk_ext_batch,
     rdk_graphonly_batch,
+    atompairs3d_batch,
+    atompairs3d_count_batch,
+    usr_batch,
+    usrcat_batch,
+    autocorr3d_batch,
+    rdf_batch,
+    morse_batch,
+    whim_batch,
+    getaway_batch,
     available,
     get,
     compute_batch,
@@ -87,6 +106,7 @@ from .standardize import (
     standardize_mol, standardize_smiles, get_inchikey,
     desalt, neutralize, canonicalize_tautomer,
     standardize_batch, deduplicate, preprocess,
+    smiles_to_mol, mol_to_smiles,
 )
 from .sklearn import (
     MACCSTransformer, ECFPTransformer, PubChemTransformer,
@@ -94,6 +114,7 @@ from .sklearn import (
     KlekotaRothTransformer, KlekotaRothCountTransformer,
     EStateTransformer, AtomPairs2DTransformer, AtomPairs2DCountTransformer,
     RDKTransformer, RDKExtTransformer, RDKGraphOnlyTransformer,
+    AtomPairs3DTransformer, AtomPairs3DCountTransformer,
     get_transformer, TRANSFORMERS,
 )
 from .interpret import interpret, interpret_molecule, compare_molecules
@@ -101,3 +122,4 @@ from .distance import (
     tanimoto, dice, cosine, sokal_michener, russel_rao,
     distance, pairwise, pairwise_distance, available_metrics,
 )
+from .viz import draw, view3d

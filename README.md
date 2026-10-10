@@ -2,14 +2,12 @@
 
 **Interpretable molecular fingerprints with SHAP-driven chemical explanations.**
 
-A native Python/RDKit library that computes 13 molecular fingerprint types and provides built-in tools for interpretation, collision detection, activity cliff analysis, bioactivity profiling, and SHAP-based feature explanation — capabilities not found in any other fingerprint library.
+A native Python/RDKit library that computes 22 molecular fingerprint types (13 2D + 9 3D) and provides built-in tools for interpretation, visualization, collision detection, activity cliff analysis, bioactivity profiling, and SHAP-based feature explanation — capabilities not found in any other fingerprint library.
 
 ## Install
 
 ```bash
-pip install molfp            # core (RDKit + scikit-learn)
-pip install molfp[shap]      # + SHAP interpretation
-pip install molfp[all]       # everything
+pip install molfp
 ```
 
 ## Quick Start
@@ -17,21 +15,68 @@ pip install molfp[all]       # everything
 ```python
 import molfp
 
-# Compute fingerprints
-fp = molfp.maccs("CCO")                        # → list of 166 ints
-fp = molfp.ecfp4("c1ccccc1", n_bits=2048)      # → list of 2048 ints
-fps = molfp.maccs_batch(["CCO", "c1ccccc1"])    # → numpy (2, 166)
+# Compute fingerprints — versatile input (str, list, Series, DataFrame)
+fp = molfp.maccs("CCO")                        # single → list of 166 ints
+fps = molfp.ecfp4(["CCO", "c1ccccc1"])         # batch → numpy (2, 1024)
+fps = molfp.ecfp4(df, n_bits=2048, n_jobs=-1)  # DataFrame with auto-detected SMILES column
 
-# All 13 types
+# All 22 types
 molfp.available()
 # ['maccs', 'ecfp4', 'pubchem', 'substructure', 'substructure_count',
 #  'klekota_roth', 'klekota_roth_count', 'estate', 'atompairs2d',
-#  'atompairs2d_count', 'rdk', 'rdk_ext', 'rdk_graphonly']
+#  'atompairs2d_count', 'rdk', 'rdk_ext', 'rdk_graphonly',
+#  'atompairs3d', 'atompairs3d_count', 'usr', 'usrcat',
+#  'autocorr3d', 'rdf', 'morse', 'whim', 'getaway']
 ```
+
+## Molecule Visualization
+
+### 2D Structure Drawing
+
+Draw molecules with optional fingerprint bit highlighting. Works in Jupyter, Colab, and Streamlit.
+
+```python
+# Single molecule
+molfp.draw("CC(=O)Oc1ccccc1C(=O)O")
+
+# Grid of molecules
+molfp.draw(smiles_list, legends=["Aspirin", "Caffeine", ...], mols_per_row=3)
+
+# Highlight atoms that trigger specific fingerprint bits
+molfp.draw("CC(=O)Oc1ccccc1C(=O)O", highlight_bits=[88, 143, 162], fp_type="maccs")
+```
+
+<p align="center">
+<img src="assets/draw_2d_grid.png" alt="2D molecule grid" width="700">
+</p>
+
+<p align="center">
+<img src="assets/draw_2d_highlight.png" alt="2D with fingerprint bit highlighting" width="300">
+</p>
+
+### 3D Interactive Viewer
+
+Interactive 3D viewer using py3Dmol. Auto-detects environment (Jupyter, Colab, Streamlit).
+
+```python
+# Interactive 3D viewer
+molfp.view3d("CN1C=NC2=C1C(=O)N(C(=O)N2C)C")
+
+# Different styles: stick, sphere, line, ball_and_stick
+molfp.view3d("CC(=O)Oc1ccccc1C(=O)O", style="ball_and_stick", spin=True)
+```
+
+Uses adaptive conformer optimization (MMFF94) to generate optimized 3D structures automatically.
+
+<p align="center">
+<img src="assets/view3d_notebook.png" alt="3D interactive viewer in Jupyter notebook" width="600">
+</p>
 
 ## Features
 
-### 13 Fingerprint Types
+### 22 Fingerprint Types
+
+#### 2D Fingerprints (13 types)
 
 | Type | Bits | Function |
 |------|------|----------|
@@ -49,9 +94,36 @@ molfp.available()
 | RDKit Extended | 1024 | `molfp.rdk_ext()` |
 | RDKit GraphOnly | 1024 | `molfp.rdk_graphonly()` |
 
+#### 3D Fingerprints (9 types)
+
+| Type | Dims | Function |
+|------|------|----------|
+| 3D Atom Pairs | 780 | `molfp.atompairs3d()` |
+| 3D Atom Pairs Count | 780 | `molfp.atompairs3d_count()` |
+| USR | 12 | `molfp.usr()` |
+| USRCAT | 60 | `molfp.usrcat()` |
+| 3D Autocorrelation | 80 | `molfp.autocorr3d()` |
+| RDF | 210 | `molfp.rdf()` |
+| MORSE | 224 | `molfp.morse()` |
+| WHIM | 114 | `molfp.whim()` |
+| GETAWAY | 273 | `molfp.getaway()` |
+
+3D fingerprints use adaptive conformer optimization with MMFF94, where iteration counts are estimated from molecular complexity via a regression model trained on 1,420 FDA-approved drugs.
+
+### Versatile Input Handling
+
+Every fingerprint function accepts any of these input types:
+
+```python
+molfp.ecfp4("c1ccccc1")                  # single SMILES → list
+molfp.ecfp4(["CCO", "c1ccccc1"])          # list → numpy array
+molfp.ecfp4(pd.Series(["CCO", "c1c..."]))  # Series → numpy array
+molfp.ecfp4(df, column="SMILES")           # DataFrame → numpy array (auto-detects column)
+```
+
 ### Bit-Level Explainability
 
-Map each ON bit to the atoms/bonds that triggered it — across all 13 FP types:
+Map each ON bit to the atoms/bonds that triggered it — across all 22 FP types:
 
 ```python
 molfp.explain("CC(=O)Oc1ccccc1C(=O)O", "ecfp4")
@@ -82,6 +154,16 @@ result = molfp.interpret(smiles, activities, fp_type="maccs", metric="pchembl")
 # ACTIVE:
 #   ↑ present  methyl group (-CH3)     SHAP +0.004  (freq 23% vs 19%)
 #   ↓ present  oxygen atom             SHAP -0.003  (freq 13% vs 17%)
+```
+
+Additional functions for molecule-level analysis:
+
+```python
+# Explain a single molecule's prediction
+molfp.interpret_molecule(smiles, interpretation_result)
+
+# Compare two molecules' structural differences by importance
+molfp.compare_molecules(smiles_a, smiles_b, interpretation_result)
 ```
 
 ### Hash Collision Detection
@@ -138,7 +220,7 @@ molfp.pairwise(X, metric="tanimoto") # (N, N_bits) → (N, N) matrix (vectorized
 
 ### scikit-learn Compatible
 
-All 13 FP types as sklearn transformers with Pipeline, GridSearchCV, and FeatureUnion support:
+All 22 FP types as sklearn transformers with Pipeline, GridSearchCV, and FeatureUnion support:
 
 ```python
 from sklearn.pipeline import make_pipeline
@@ -154,23 +236,33 @@ pipe.fit(smiles_train, y_train)
 ### Sparse Matrix & Parallelism
 
 ```python
-molfp.klekota_roth_batch(smiles, sparse=True, n_jobs=-1)
+molfp.klekota_roth(smiles_list, sparse=True, n_jobs=-1)
 # → scipy.sparse.csr_matrix, 97% memory savings for KR 4860-bit FPs
+```
+
+### Consensus Fingerprints
+
+Build optimal fusion fingerprints from multiple types using mutual information:
+
+```python
+molfp.fuse(smiles, activities, ["ecfp4", "maccs", "pubchem"])
 ```
 
 ## Comparison with scikit-fingerprints (skfp)
 
 | Feature | molfp | skfp |
 |---------|-------|------|
-| Fingerprint types | 13 | 35 |
-| Bit-level explainability | All 13 FPs | None |
+| Fingerprint types | 22 (13 2D + 9 3D) | 35 |
+| Bit-level explainability | All 22 FPs | None |
 | Chemical annotation | Built-in | Feature names only |
 | SHAP + chemical meaning | `interpret()` | None |
 | Hash collision detection | `detect_collisions()` | None |
 | Activity cliff detection | `activity_cliffs()` | None |
 | Bioactivity profiling | `classify()`, `enriched_bits()` | None |
 | Consensus fingerprints | `fuse()` | None |
+| Molecule visualization | 2D + 3D interactive | None |
 | Structure standardization | Full pipeline | Basic |
+| Adaptive conformer opt. | MLR-based (FDA drugs) | None |
 | sklearn compatible | Yes | Yes |
 | Sparse + parallel | Yes | Yes |
 

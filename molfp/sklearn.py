@@ -178,20 +178,58 @@ class RDKExtTransformer(BaseEstimator, TransformerMixin):
 class RDKGraphOnlyTransformer(BaseEstimator, TransformerMixin):
     """RDKit GraphOnly (configurable bits) sklearn transformer."""
 
-    def __init__(self, n_bits: int = 1024, n_jobs: int = 1, sparse: bool = False) -> None:
+    def __init__(self, n_bits: int = 1024, n_jobs: int = 1, sparse: bool = False):
         self.n_bits = n_bits
         self.n_jobs = n_jobs
         self.sparse = sparse
 
-    def fit(self, X: list[Union[str, Chem.rdchem.Mol]], y: Any = None) -> RDKGraphOnlyTransformer:
+    def fit(self, X: Any, y: Any = None) -> RDKGraphOnlyTransformer:
         return self
 
-    def transform(self, X: list[Union[str, Chem.rdchem.Mol]]) -> Union[np.ndarray, scipy.sparse.csr_matrix]:
-        fn = lambda s: fp_mod.rdk_graphonly(s, n_bits=self.n_bits)
+    def transform(self, X: Any) -> np.ndarray:
+        fn = lambda s: fp_mod._rdk_graphonly_single(s, n_bits=self.n_bits)
         return fp_mod._batch(fn, X, n_jobs=self.n_jobs, sparse=self.sparse)
 
     def get_feature_names_out(self, input_features: Any = None) -> np.ndarray:
         return np.array([f"RDKGO_{i}" for i in range(self.n_bits)])
+
+
+class AtomPairs3DTransformer(BaseEstimator, TransformerMixin):
+    """3D Atom Pairs (configurable bits) sklearn transformer."""
+
+    def __init__(self, n_bits: int = 780, n_jobs: int = 1, sparse: bool = False):
+        self.n_bits = n_bits
+        self.n_jobs = n_jobs
+        self.sparse = sparse
+
+    def fit(self, X: Any, y: Any = None) -> AtomPairs3DTransformer:
+        return self
+
+    def transform(self, X: Any) -> np.ndarray:
+        fn = lambda s: fp_mod._atompairs3d_single(s, n_bits=self.n_bits)
+        return fp_mod._batch(fn, X, n_jobs=self.n_jobs, sparse=self.sparse)
+
+    def get_feature_names_out(self, input_features: Any = None) -> np.ndarray:
+        return np.array([f"AD3D_{i}" for i in range(self.n_bits)])
+
+
+class AtomPairs3DCountTransformer(BaseEstimator, TransformerMixin):
+    """3D Atom Pairs Count (configurable bits) sklearn transformer."""
+
+    def __init__(self, n_bits: int = 780, n_jobs: int = 1, sparse: bool = False):
+        self.n_bits = n_bits
+        self.n_jobs = n_jobs
+        self.sparse = sparse
+
+    def fit(self, X: Any, y: Any = None) -> AtomPairs3DCountTransformer:
+        return self
+
+    def transform(self, X: Any) -> np.ndarray:
+        fn = lambda s: fp_mod._atompairs3d_count_single(s, n_bits=self.n_bits)
+        return fp_mod._batch(fn, X, n_jobs=self.n_jobs, sparse=self.sparse)
+
+    def get_feature_names_out(self, input_features: Any = None) -> np.ndarray:
+        return np.array([f"AD3DC_{i}" for i in range(self.n_bits)])
 
 
 # ── Registry ──────────────────────────────────────────────────────────────────
@@ -210,7 +248,30 @@ TRANSFORMERS = {
     "rdk": RDKTransformer,
     "rdk_ext": RDKExtTransformer,
     "rdk_graphonly": RDKGraphOnlyTransformer,
+    "atompairs3d": AtomPairs3DTransformer,
+    "atompairs3d_count": AtomPairs3DCountTransformer,
 }
+
+# Add 3D descriptor transformers dynamically (fixed size, no configurable n_bits)
+_3D_DESCRIPTOR_FPS = {
+    "usr": ("_usr_single", 12, "USR"),
+    "usrcat": ("_usrcat_single", 60, "USRCAT"),
+    "autocorr3d": ("_autocorr3d_single", 80, "AUTOCORR3D"),
+    "rdf": ("_rdf_single", 210, "RDF"),
+    "morse": ("_morse_single", 224, "MORSE"),
+    "whim": ("_whim_single", 114, "WHIM"),
+    "getaway": ("_getaway_single", 273, "GETAWAY"),
+}
+
+for _name, (_fn_name, _n_bits, _prefix) in _3D_DESCRIPTOR_FPS.items():
+    _cls_name = f"{_prefix}Transformer"
+    _cls = type(_cls_name, (_BaseFingerprintTransformer,), {
+        "_fp_fn_name": _fn_name,
+        "_default_n_bits": _n_bits,
+        "__doc__": f"{_prefix} ({_n_bits} features) sklearn transformer.",
+    })
+    globals()[_cls_name] = _cls
+    TRANSFORMERS[_name] = _cls
 
 
 def get_transformer(name: str, **kwargs: Any) -> BaseEstimator:

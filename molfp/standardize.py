@@ -53,6 +53,102 @@ def standardize_mol(smiles_or_mol: Union[str, Chem.rdchem.Mol]) -> Chem.rdchem.M
     return mol
 
 
+# ── Mol ↔ SMILES conversion ──────────────────────────────────────────────────
+
+def smiles_to_mol(input_data, *, column=None, standardize=False):
+    """Convert SMILES to RDKit Mol objects.
+
+    Args:
+        input_data: SMILES string, list of SMILES, pd.Series, or pd.DataFrame
+        column: DataFrame column name (auto-detected if None)
+        standardize: if True, apply full standardization pipeline
+
+    Returns:
+        Single Mol (for string input) or list[Mol|None] (for batch input).
+        Returns None for invalid SMILES.
+    """
+    data, is_batch = _extract_input(input_data, column)
+
+    if not is_batch:
+        if standardize:
+            return standardize_mol(data)
+        return Chem.MolFromSmiles(data) if isinstance(data, str) else data
+
+    results = []
+    for smi in data:
+        if standardize:
+            results.append(standardize_mol(smi))
+        else:
+            results.append(Chem.MolFromSmiles(smi) if isinstance(smi, str) else smi)
+    return results
+
+
+def mol_to_smiles(input_data, *, column=None, canonical=True):
+    """Convert RDKit Mol objects (or SMILES) to canonical SMILES strings.
+
+    Args:
+        input_data: Mol, SMILES string, list, pd.Series, or pd.DataFrame
+        column: DataFrame column name (auto-detected if None)
+        canonical: if True (default), return canonical SMILES
+
+    Returns:
+        Single SMILES string (for single input) or list[str|None] (for batch).
+    """
+    data, is_batch = _extract_input(input_data, column)
+
+    if not is_batch:
+        return _to_smiles(data, canonical)
+
+    return [_to_smiles(item, canonical) for item in data]
+
+
+def _to_smiles(mol_or_smi, canonical=True):
+    """Convert a single Mol or SMILES to a canonical SMILES string."""
+    if mol_or_smi is None:
+        return None
+    if isinstance(mol_or_smi, str):
+        mol = Chem.MolFromSmiles(mol_or_smi)
+    elif isinstance(mol_or_smi, Chem.rdchem.Mol):
+        mol = mol_or_smi
+    else:
+        return None
+    if mol is None:
+        return None
+    return Chem.MolToSmiles(mol, canonical=canonical)
+
+
+def _extract_input(input_data, column=None):
+    """Extract data from various input types. Returns (data, is_batch)."""
+    if isinstance(input_data, str):
+        return input_data, False
+
+    if isinstance(input_data, Chem.rdchem.Mol):
+        return input_data, False
+
+    try:
+        import pandas as pd
+        if isinstance(input_data, pd.DataFrame):
+            if column is not None:
+                return input_data[column].tolist(), True
+            for col in ["SMILES", "smiles", "Smiles", "canonical_smiles", "CANONICAL_SMILES",
+                        "mol", "Mol", "MOL", "molecule", "smi"]:
+                if col in input_data.columns:
+                    return input_data[col].tolist(), True
+            raise ValueError(
+                "DataFrame has no recognized SMILES column. "
+                "Pass column= or use a column named 'SMILES', 'smiles', or 'canonical_smiles'."
+            )
+        if isinstance(input_data, pd.Series):
+            return input_data.tolist(), True
+    except ImportError:
+        pass
+
+    if hasattr(input_data, '__iter__') and not isinstance(input_data, (str, bytes)):
+        return list(input_data), True
+
+    return input_data, False
+
+
 def standardize_smiles(smiles: str) -> str | None:
     """Standardize a SMILES string. Returns canonical SMILES or None."""
     mol = standardize_mol(smiles)
