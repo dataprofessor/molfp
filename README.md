@@ -46,13 +46,16 @@ molfp.draw(smiles_list, legends=["Aspirin", "Caffeine", ...], mols_per_row=3)
 molfp.draw("CC(=O)Oc1ccccc1C(=O)O", highlight_bits=[88, 143, 162], fp_type="maccs")
 ```
 
-<p align="center">
-<img src="assets/draw_2d_grid.png" alt="2D molecule grid" width="700">
-</p>
-
-<p align="center">
-<img src="assets/draw_2d_highlight.png" alt="2D with fingerprint bit highlighting" width="300">
-</p>
+<table>
+<tr>
+<td align="center"><img src="assets/draw_2d_grid.png" alt="2D molecule grid" width="500"></td>
+<td align="center"><img src="assets/draw_2d_highlight.png" alt="2D with fingerprint bit highlighting" width="220"></td>
+</tr>
+<tr>
+<td align="center"><em>Molecule grid with labels</em></td>
+<td align="center"><em>Fingerprint bit highlighting</em></td>
+</tr>
+</table>
 
 ### 3D Interactive Viewer
 
