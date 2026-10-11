@@ -1746,6 +1746,111 @@ class TestGraph:
         params = t.get_params()
         assert params["enriched"] is True
 
+    # ── Distance graph ───────────────────────────────────────────────────
+
+    def test_distance_graph_complete(self):
+        g = molfp.mol_graph("CCO", type="distance")
+        n = g["num_atoms"]  # includes explicit Hs after conformer generation
+        assert g["num_edges"] == n * (n - 1)  # complete graph
+        assert g.get("type") == "distance"
+
+    def test_distance_edge_features_dim(self):
+        g = molfp.mol_graph("CCO", type="distance")
+        assert g["edge_features"].shape[1] == 9
+
+    def test_distance_positive(self):
+        g = molfp.mol_graph("CCO", type="distance")
+        assert all(g["edge_features"][:, 0] > 0)
+
+    def test_distance_bonded_flag(self):
+        g = molfp.mol_graph("CCO", type="distance")
+        is_bonded = g["edge_features"][:, 2]
+        # Should have some bonded and some non-bonded edges
+        assert sum(is_bonded) > 0
+        assert sum(is_bonded) < g["num_edges"]
+
+    def test_distance_benzene(self):
+        g = molfp.mol_graph("c1ccccc1", type="distance")
+        n = g["num_atoms"]
+        assert g["num_edges"] == n * (n - 1)
+
+    def test_distance_batch(self):
+        graphs = molfp.mol_graph(["CCO", "c1ccccc1"], type="distance")
+        assert len(graphs) == 2
+
+    def test_distance_graph_vectors(self):
+        X = molfp.graph_vectors(["CCO", "c1ccccc1"], type="distance")
+        assert X.shape[0] == 2
+
+    # ── Line graph ───────────────────────────────────────────────────────
+
+    def test_line_graph_nodes_are_bonds(self):
+        g = molfp.mol_graph("CCO", type="line")
+        assert g["num_atoms"] == 2
+        assert g.get("type") == "line"
+
+    def test_line_node_dim(self):
+        g = molfp.mol_graph("CCO", type="line")
+        assert g["atom_features"].shape[1] == 52  # 20+20+12
+
+    def test_line_edge_dim(self):
+        g = molfp.mol_graph("CCO", type="line")
+        if g["num_edges"] > 0:
+            assert g["edge_features"].shape[1] == 20
+
+    def test_line_connectivity(self):
+        g = molfp.mol_graph("CCO", type="line")
+        assert g["num_edges"] == 2  # 2 adjacent bonds
+
+    def test_line_benzene(self):
+        g = molfp.mol_graph("c1ccccc1", type="line")
+        assert g["num_atoms"] == 6
+
+    def test_line_single_bond(self):
+        g = molfp.mol_graph("CO", type="line")
+        assert g["num_atoms"] == 1
+        assert g["num_edges"] == 0
+
+    def test_line_batch(self):
+        graphs = molfp.mol_graph(["CCO", "c1ccccc1"], type="line")
+        assert len(graphs) == 2
+
+    def test_line_graph_vectors(self):
+        X = molfp.graph_vectors(["CCO", "c1ccccc1"], type="line")
+        assert X.shape[0] == 2
+
+    # ── Fragment graph ───────────────────────────────────────────────────
+
+    def test_fragment_aspirin(self):
+        g = molfp.mol_graph("CC(=O)Oc1ccccc1C(=O)O", type="fragment")
+        assert g["num_atoms"] > 0
+        assert g.get("type") == "fragment"
+
+    def test_fragment_node_dim(self):
+        g = molfp.mol_graph("CC(=O)Oc1ccccc1C(=O)O", type="fragment")
+        assert g["atom_features"].shape[1] == 41  # 20+1+20
+
+    def test_fragment_edge_dim(self):
+        g = molfp.mol_graph("CC(=O)Oc1ccccc1C(=O)O", type="fragment")
+        if g["num_edges"] > 0:
+            assert g["edge_features"].shape[1] == 2
+
+    def test_fragment_alkane_fallback(self):
+        g = molfp.mol_graph("CCCCCC", type="fragment")
+        assert g["num_atoms"] >= 1
+
+    def test_fragment_batch(self):
+        graphs = molfp.mol_graph(["CC(=O)O", "c1ccccc1"], type="fragment")
+        assert len(graphs) == 2
+
+    def test_fragment_graph_vectors(self):
+        X = molfp.graph_vectors(["CC(=O)O", "c1ccccc1"], type="fragment")
+        assert X.shape[0] == 2
+
+    def test_invalid_type_raises(self):
+        with pytest.raises(ValueError, match="Unknown type"):
+            molfp.mol_graph("CCO", type="invalid")
+
 
 # =============================================================================
 # 21. Standalone feature selection

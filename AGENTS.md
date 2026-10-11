@@ -13,9 +13,14 @@ molfp.mol_graph(smiles, type="line")        # bonds=nodes, bond-bond connections
 molfp.mol_graph(smiles, type="fragment")    # functional groups=nodes
 ```
 
-Currently implemented: `type="standard"` (default).
+Currently implemented: all 4 types.
 
-Planned:
+| Type | Parameter | Nodes | Edges | GNN Use |
+|------|-----------|-------|-------|---------|
+| `"standard"` | default | Atoms | Bonds | GCN, GAT, GIN |
+| `"distance"` | 3D required | Atoms | All pairs (3D dist) | SchNet, DimeNet |
+| `"line"` | | Bonds | Bond-bond connections | D-MPNN, Chemprop |
+| `"fragment"` | | Functional groups | Group connections | Hierarchical GNNs |
 
 1. **`type="distance"`** — complete graph where every atom pair is connected, edge weight = 3D Euclidean distance. Used by SchNet, DimeNet, SphereNet. We already have `_ensure_conformer()` for 3D coordinates.
 

@@ -16,7 +16,7 @@ import numpy as np
 from rdkit import Chem
 from rdkit.Chem import rdchem, AllChem, rdMolDescriptors
 
-from .fingerprints import _ensure_mol, _extract_smiles
+from .fingerprints import _ensure_mol, _extract_smiles, _ensure_conformer
 
 
 # ── Feature registries ───────────────────────────────────────────────────────
@@ -256,6 +256,241 @@ def _mol_graph_single(smiles_or_mol, enriched=False):
     }
 
 
+# ── Distance graph (complete graph with 3D distances) ────────────────────────
+
+DISTANCE_EDGE_DIM = 9  # distance, 1/dist, is_bonded, bond_type(4), conjugated, in_ring
+
+def _distance_graph_single(smiles_or_mol, enriched=False):
+    """Complete graph where every atom pair is connected with 3D distance."""
+    mol = _ensure_mol(smiles_or_mol)
+    mol = _ensure_conformer(mol)
+    smiles = Chem.MolToSmiles(mol)
+    conf = mol.GetConformer()
+    n_atoms = mol.GetNumAtoms()
+
+    # Atom features (same as standard)
+    if enriched:
+        atom_feats = _enriched_atom_features(mol)
+    else:
+        atom_feats = np.array([_atom_features(a) for a in mol.GetAtoms()], dtype=np.float32)
+
+    # Build bond lookup for is_bonded + bond features
+    bond_map = {}
+    for bond in mol.GetBonds():
+        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        feat = _edge_features(bond)
+        bond_map[(i, j)] = feat
+        bond_map[(j, i)] = feat
+
+    # All atom pairs
+    edge_src, edge_dst, edge_feats = [], [], []
+    for i in range(n_atoms):
+        pi = conf.GetAtomPosition(i)
+        for j in range(n_atoms):
+            if i == j:
+                continue
+            pj = conf.GetAtomPosition(j)
+            dist = pi.Distance(pj)
+            inv_dist = 1.0 / max(dist, 1e-6)
+            is_bonded = 1.0 if (i, j) in bond_map else 0.0
+
+            if (i, j) in bond_map:
+                bf = bond_map[(i, j)]
+            else:
+                bf = [0.0] * EDGE_FEATURE_DIM  # no bond
+
+            # Edge features: dist, 1/dist, is_bonded, bond_type(4), conjugated, in_ring
+            feat = [dist, inv_dist, is_bonded] + bf[:4] + [bf[4], bf[5]]
+            edge_src.append(i)
+            edge_dst.append(j)
+            edge_feats.append(feat)
+
+    edge_index = np.array([edge_src, edge_dst], dtype=np.int64)
+    edge_feats = np.array(edge_feats, dtype=np.float32)
+
+    return {
+        "atom_features": atom_feats,
+        "edge_index": edge_index,
+        "edge_features": edge_feats,
+        "num_atoms": n_atoms,
+        "num_edges": int(edge_index.shape[1]),
+        "smiles": smiles,
+        "type": "distance",
+    }
+
+
+# ── Line graph (bonds as nodes) ──────────────────────────────────────────────
+
+LINE_NODE_DIM = 2 * ATOM_FEATURE_DIM + EDGE_FEATURE_DIM  # 20+20+12 = 52
+LINE_EDGE_DIM = ATOM_FEATURE_DIM  # shared atom features = 20
+
+def _line_graph_single(smiles_or_mol):
+    """Line graph where bonds become nodes, connected when sharing an atom."""
+    mol = _ensure_mol(smiles_or_mol)
+    smiles = Chem.MolToSmiles(mol)
+
+    bonds = list(mol.GetBonds())
+    n_bonds = len(bonds)
+
+    if n_bonds == 0:
+        return {
+            "atom_features": np.zeros((0, LINE_NODE_DIM), dtype=np.float32),
+            "edge_index": np.zeros((2, 0), dtype=np.int64),
+            "edge_features": np.zeros((0, LINE_EDGE_DIM), dtype=np.float32),
+            "num_atoms": 0,
+            "num_edges": 0,
+            "smiles": smiles,
+            "type": "line",
+        }
+
+    # Precompute atom features
+    atom_feat_map = {}
+    for atom in mol.GetAtoms():
+        atom_feat_map[atom.GetIdx()] = _atom_features(atom)
+
+    # Bond-node features: [source_atom_feats, dest_atom_feats, bond_feats]
+    node_feats = []
+    bond_atoms = []  # (begin, end) for each bond
+    for bond in bonds:
+        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        bond_atoms.append((i, j))
+        feat = atom_feat_map[i] + atom_feat_map[j] + _edge_features(bond)
+        node_feats.append(feat)
+    node_feats = np.array(node_feats, dtype=np.float32)
+
+    # Edge index: bond_a → bond_b when they share an atom
+    edge_src, edge_dst, edge_feats = [], [], []
+    for a in range(n_bonds):
+        atoms_a = set(bond_atoms[a])
+        for b in range(n_bonds):
+            if a == b:
+                continue
+            atoms_b = set(bond_atoms[b])
+            shared = atoms_a & atoms_b
+            if shared:
+                shared_atom = list(shared)[0]
+                edge_src.append(a)
+                edge_dst.append(b)
+                edge_feats.append(atom_feat_map[shared_atom])
+
+    if edge_src:
+        edge_index = np.array([edge_src, edge_dst], dtype=np.int64)
+        edge_feats = np.array(edge_feats, dtype=np.float32)
+    else:
+        edge_index = np.zeros((2, 0), dtype=np.int64)
+        edge_feats = np.zeros((0, LINE_EDGE_DIM), dtype=np.float32)
+
+    return {
+        "atom_features": node_feats,
+        "edge_index": edge_index,
+        "edge_features": edge_feats,
+        "num_atoms": n_bonds,
+        "num_edges": int(edge_index.shape[1]),
+        "smiles": smiles,
+        "type": "line",
+    }
+
+
+# ── Fragment graph (functional groups as nodes) ──────────────────────────────
+
+def _fragment_graph_single(smiles_or_mol):
+    """Fragment graph where functional groups are nodes."""
+    mol = _ensure_mol(smiles_or_mol)
+    smiles = Chem.MolToSmiles(mol)
+
+    fg_patterns = _get_fg_patterns()
+    fg_names = sorted(fg_patterns.keys())
+    n_fg_types = len(fg_names)
+
+    # Find all fragment instances
+    fragments = []  # (fg_index, atom_set)
+    for i, name in enumerate(fg_names):
+        matches = mol.GetSubstructMatches(fg_patterns[name])
+        for match in matches:
+            fragments.append((i, set(match)))
+
+    if not fragments:
+        # No recognized functional groups — return single node for whole molecule
+        atom_feats_all = np.array([_atom_features(a) for a in mol.GetAtoms()], dtype=np.float32)
+        mean_feats = np.mean(atom_feats_all, axis=0) if len(atom_feats_all) > 0 else np.zeros(ATOM_FEATURE_DIM)
+        node_feat = np.zeros(n_fg_types + 1 + ATOM_FEATURE_DIM, dtype=np.float32)
+        node_feat[n_fg_types] = mol.GetNumAtoms()
+        node_feat[n_fg_types + 1:] = mean_feats
+        return {
+            "atom_features": node_feat.reshape(1, -1),
+            "edge_index": np.zeros((2, 0), dtype=np.int64),
+            "edge_features": np.zeros((0, 2), dtype=np.float32),
+            "num_atoms": 1,
+            "num_edges": 0,
+            "smiles": smiles,
+            "type": "fragment",
+        }
+
+    # Precompute atom features
+    atom_feat_map = {}
+    for atom in mol.GetAtoms():
+        atom_feat_map[atom.GetIdx()] = np.array(_atom_features(atom), dtype=np.float32)
+
+    # Node features: [fg_type_one_hot(20), n_atoms(1), mean_atom_features(20)] = 41
+    node_feats = []
+    for fg_idx, atom_set in fragments:
+        one_hot = [0.0] * n_fg_types
+        one_hot[fg_idx] = 1.0
+        n_atoms_frag = float(len(atom_set))
+        mean_atom = np.mean([atom_feat_map[a] for a in atom_set], axis=0)
+        node_feats.append(one_hot + [n_atoms_frag] + mean_atom.tolist())
+    node_feats = np.array(node_feats, dtype=np.float32)
+
+    # Edges: two fragments connected if they share atoms or are bonded
+    edge_src, edge_dst, edge_feats = [], [], []
+    for a in range(len(fragments)):
+        atoms_a = fragments[a][1]
+        for b in range(len(fragments)):
+            if a == b:
+                continue
+            atoms_b = fragments[b][1]
+
+            # Shared atoms
+            shared = atoms_a & atoms_b
+            if shared:
+                edge_src.append(a)
+                edge_dst.append(b)
+                edge_feats.append([float(len(shared)), 0.0])
+                continue
+
+            # Check if any atom in a is bonded to any atom in b
+            connected = False
+            for ai in atoms_a:
+                atom_obj = mol.GetAtomWithIdx(ai)
+                for nb in atom_obj.GetNeighbors():
+                    if nb.GetIdx() in atoms_b:
+                        connected = True
+                        break
+                if connected:
+                    break
+            if connected:
+                edge_src.append(a)
+                edge_dst.append(b)
+                edge_feats.append([0.0, 1.0])
+
+    if edge_src:
+        edge_index = np.array([edge_src, edge_dst], dtype=np.int64)
+        edge_feats = np.array(edge_feats, dtype=np.float32)
+    else:
+        edge_index = np.zeros((2, 0), dtype=np.int64)
+        edge_feats = np.zeros((0, 2), dtype=np.float32)
+
+    return {
+        "atom_features": node_feats,
+        "edge_index": edge_index,
+        "edge_features": edge_feats,
+        "num_atoms": len(fragments),
+        "num_edges": int(edge_index.shape[1]),
+        "smiles": smiles,
+        "type": "fragment",
+    }
+
+
 def mol_graph(input_data, *, column=None, enriched=False, type="standard"):
     """Convert molecule(s) to graph representation(s) for deep learning.
 
@@ -264,8 +499,12 @@ def mol_graph(input_data, *, column=None, enriched=False, type="standard"):
         column: column name for DataFrame input.
         enriched: if True, add Morgan hashes, functional group membership,
             and neighbor counts per atom (432 dims vs 20 base dims).
-        type: graph type — "standard" (atoms=nodes, bonds=edges).
-            Future: "distance", "line", "fragment".
+            Only applies to type="standard" and type="distance".
+        type: graph type:
+            "standard" — atoms=nodes, bonds=edges (GCN, GAT, GIN)
+            "distance" — atoms=nodes, all pairs=edges with 3D distance (SchNet, DimeNet)
+            "line" — bonds=nodes, bond-bond connections (D-MPNN, Chemprop)
+            "fragment" — functional groups=nodes (hierarchical GNNs)
 
     Returns:
         Single molecule: dict with atom_features, edge_index, edge_features.
@@ -274,15 +513,22 @@ def mol_graph(input_data, *, column=None, enriched=False, type="standard"):
     _VALID_TYPES = ("standard", "distance", "line", "fragment")
     if type not in _VALID_TYPES:
         raise ValueError(f"Unknown type={type!r}. Available: {_VALID_TYPES}")
-    if type != "standard":
-        raise NotImplementedError(f"type={type!r} is planned but not yet implemented. Use type='standard'.")
+
+    # Select builder
+    builders = {
+        "standard": lambda s: _mol_graph_single(s, enriched=enriched),
+        "distance": lambda s: _distance_graph_single(s, enriched=enriched),
+        "line": lambda s: _line_graph_single(s),
+        "fragment": lambda s: _fragment_graph_single(s),
+    }
+    build = builders[type]
 
     data, is_batch = _extract_smiles(input_data, column=column)
 
     if not is_batch:
-        return _mol_graph_single(data, enriched=enriched)
+        return build(data)
 
-    return [_mol_graph_single(s, enriched=enriched) for s in data]
+    return [build(s) for s in data]
 
 
 # ── PyTorch Geometric converter ──────────────────────────────────────────────
@@ -465,8 +711,9 @@ def graph_to_vector(graph_dict):
     arom_atom_mean = np.mean(af[arom_mask], axis=0) if arom_mask.any() else zero_atom
     nonarom_atom_mean = np.mean(af[nonarom_mask], axis=0) if nonarom_mask.any() else zero_atom
 
-    # ── 5. Global edge aggregations (2 × 12) ────────────────────────────
-    zero_edge = np.zeros(EDGE_FEATURE_DIM, dtype=np.float32)
+    # ── 5. Global edge aggregations (2 × ef_dim) ──────────────────────
+    ef_dim = ef.shape[1]
+    zero_edge = np.zeros(ef_dim, dtype=np.float32)
     if ef.shape[0] > 0:
         edge_mean = np.mean(ef, axis=0)
         edge_max = np.max(ef, axis=0)
@@ -474,9 +721,10 @@ def graph_to_vector(graph_dict):
         edge_mean = zero_edge
         edge_max = zero_edge
 
-    # ── 6. Ring edge vs non-ring edge (2 × 12) ──────────────────────────
+    # ── 6. Ring edge vs non-ring edge (2 × ef_dim) ──────────────────
+    # Only split by ring if edge features have the ring column (standard/distance)
     edge_ring_col = 5
-    if ef.shape[0] > 0:
+    if ef.shape[0] > 0 and ef.shape[1] > edge_ring_col:
         ering_mask = ef[:, edge_ring_col] == 1
         enonring_mask = ~ering_mask
         ring_edge_mean = np.mean(ef[ering_mask], axis=0) if ering_mask.any() else zero_edge
@@ -489,18 +737,21 @@ def graph_to_vector(graph_dict):
     n_edges = graph_dict["num_edges"]
     max_edges = n_atoms * (n_atoms - 1) if n_atoms > 1 else 1
     sp3_col = 15
+    has_sp3 = af_dim > sp3_col
+    has_arom = af_dim > arom_col
+    has_ring = af_dim > ring_col
 
     graph_topo = np.array([
         n_atoms,
         n_edges,
         n_edges / max(n_atoms, 1),
         n_edges / max(max_edges, 1),
-        float(np.mean(af[:, arom_col])),
-        float(np.mean(af[:, ring_col])),
-        float(np.mean(af[:, sp3_col])),
-        float(1.0 - np.mean(af[:, 0])),
-        float(np.sum(af[:, ring_col])),
-        float(np.sum(ef[:, edge_ring_col])) / 2 if ef.shape[0] > 0 else 0,
+        float(np.mean(af[:, arom_col])) if has_arom else 0.0,
+        float(np.mean(af[:, ring_col])) if has_ring else 0.0,
+        float(np.mean(af[:, sp3_col])) if has_sp3 else 0.0,
+        float(1.0 - np.mean(af[:, 0])) if af_dim > 0 else 0.0,
+        float(np.sum(af[:, ring_col])) if has_ring else 0.0,
+        float(np.sum(ef[:, edge_ring_col])) / 2 if ef.shape[0] > 0 and ef.shape[1] > edge_ring_col else 0.0,
     ], dtype=np.float32)
 
     return np.concatenate([
@@ -523,28 +774,20 @@ def graph_vectors(input_data, *, column=None, enriched=False, type="standard"):
     Args:
         input_data: SMILES string, list, Series, or DataFrame.
         column: column name for DataFrame input.
-        enriched: if True, use enriched atom features (Morgan hashes +
-            functional groups + neighbor counts) for richer aggregation.
-        type: graph type — "standard" (atoms=nodes, bonds=edges).
-            Future: "distance", "line", "fragment".
+        enriched: if True, use enriched atom features.
+        type: graph type — "standard", "distance", "line", "fragment".
 
     Returns:
         Single molecule: numpy array
         Multiple molecules: numpy array (n_samples, n_features)
     """
-    _VALID_TYPES = ("standard", "distance", "line", "fragment")
-    if type not in _VALID_TYPES:
-        raise ValueError(f"Unknown type={type!r}. Available: {_VALID_TYPES}")
-    if type != "standard":
-        raise NotImplementedError(f"type={type!r} is planned but not yet implemented. Use type='standard'.")
-
     data, is_batch = _extract_smiles(input_data, column=column)
 
     if not is_batch:
-        g = _mol_graph_single(data, enriched=enriched)
+        g = mol_graph(data, enriched=enriched, type=type)
         return graph_to_vector(g)
 
-    graphs = [_mol_graph_single(s, enriched=enriched) for s in data]
+    graphs = mol_graph(data, enriched=enriched, type=type)
     return np.array([graph_to_vector(g) for g in graphs], dtype=np.float32)
 
 
