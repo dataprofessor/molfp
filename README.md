@@ -20,13 +20,16 @@ fp = molfp.maccs("CCO")                        # single → list of 166 ints
 fps = molfp.ecfp4(["CCO", "c1ccccc1"])         # batch → numpy (2, 1024)
 fps = molfp.ecfp4(df, n_bits=2048, n_jobs=-1)  # DataFrame with auto-detected SMILES column
 
-# All 22 types
+# All 30 types
 molfp.available()
 # ['maccs', 'ecfp4', 'pubchem', 'substructure', 'substructure_count',
 #  'klekota_roth', 'klekota_roth_count', 'estate', 'atompairs2d',
 #  'atompairs2d_count', 'rdk', 'rdk_ext', 'rdk_graphonly',
 #  'atompairs3d', 'atompairs3d_count', 'usr', 'usrcat',
-#  'autocorr3d', 'rdf', 'morse', 'whim', 'getaway']
+#  'autocorr3d', 'rdf', 'morse', 'whim', 'getaway',
+#  'graph_standard', 'graph_distance', 'graph_line', 'graph_fragment',
+#  'graph_standard_enriched', 'graph_distance_enriched',
+#  'graph_line_enriched', 'graph_fragment_enriched']
 ```
 
 ## Molecule Visualization
@@ -77,7 +80,7 @@ Uses adaptive conformer optimization (MMFF94) to generate optimized 3D structure
 
 ## Features
 
-### 22 Fingerprint Types
+### 30 Fingerprint Types
 
 #### 2D Fingerprints (13 types)
 
@@ -113,6 +116,21 @@ Uses adaptive conformer optimization (MMFF94) to generate optimized 3D structure
 
 3D fingerprints use adaptive conformer optimization with MMFF94, where iteration counts are estimated from molecular complexity via a regression model trained on 1,420 FDA-approved drugs.
 
+#### Graph Fingerprints (8 types)
+
+| Type | Dims | Function |
+|------|------|----------|
+| Graph Standard | 298 | `molfp.compute_batch(smiles, "graph_standard")` |
+| Graph Distance (3D) | 286 | `molfp.compute_batch(smiles, "graph_distance")` |
+| Graph Line | 714 | `molfp.compute_batch(smiles, "graph_line")` |
+| Graph Fragment | 510 | `molfp.compute_batch(smiles, "graph_fragment")` |
+| Graph Standard Enriched | 5,242 | `molfp.compute_batch(smiles, "graph_standard_enriched")` |
+| Graph Distance Enriched | 5,230 | `molfp.compute_batch(smiles, "graph_distance_enriched")` |
+| Graph Line Enriched | 12,250 | `molfp.compute_batch(smiles, "graph_line_enriched")` |
+| Graph Fragment Enriched | 5,454 | `molfp.compute_batch(smiles, "graph_fragment_enriched")` |
+
+Enriched variants add Morgan environment hashes, functional group membership, and neighbor type counts per atom. Base variants use atom-level properties only (type, degree, charge, hybridization, aromaticity, ring).
+
 ### Versatile Input Handling
 
 Every fingerprint function accepts any of these input types:
@@ -126,7 +144,7 @@ molfp.ecfp4(df, column="SMILES")           # DataFrame → numpy array (auto-det
 
 ### Bit-Level Explainability
 
-Map each ON bit to the atoms/bonds that triggered it — across all 22 FP types:
+Map each ON bit to the atoms/bonds that triggered it — across all 13 2D FP types:
 
 ```python
 molfp.explain("CC(=O)Oc1ccccc1C(=O)O", "ecfp4")
@@ -223,7 +241,7 @@ molfp.pairwise(X, metric="tanimoto") # (N, N_bits) → (N, N) matrix (vectorized
 
 ### scikit-learn Compatible
 
-All 22 FP types as sklearn transformers with Pipeline, GridSearchCV, and FeatureUnion support:
+All 30 FP types as sklearn transformers with Pipeline, GridSearchCV, and FeatureUnion support:
 
 ```python
 from sklearn.pipeline import make_pipeline
@@ -251,16 +269,37 @@ Build optimal fusion fingerprints from multiple types using mutual information:
 molfp.fuse(smiles, activities, ["ecfp4", "maccs", "pubchem"])
 ```
 
+### Feature Selection
+
+Standalone functions that work with any fingerprint or graph feature output:
+
+```python
+# Remove constant/near-constant features (no labels needed)
+result = molfp.remove_low_variance(X, threshold=0.01)
+X_clean = result["X"]  # filtered matrix
+
+# Select top-k features by mutual information (requires labels)
+result = molfp.select_features(X, y, k=500, threshold=0.01)
+X_selected = result["X"]       # (n_samples, 500)
+result["indices"]               # original column indices
+result["scores"]                # mutual information scores
+```
+
 ### Molecular Graph Representations for Deep Learning
 
 Convert molecules to atom/bond feature matrices for graph neural networks (GCN, GAT, MPNN, etc.). Framework-agnostic core with optional PyTorch Geometric and DGL converters.
 
 ```python
 # Convert to graph — returns NumPy arrays (no DL framework needed)
-g = molfp.mol_graph("c1ccccc1")
-# g["atom_features"]  → numpy (6, 20)   atom feature matrix
-# g["edge_index"]     → numpy (2, 12)   adjacency (undirected)
-# g["edge_features"]  → numpy (12, 12)  bond feature matrix
+g = molfp.mol_graph("c1ccccc1")                      # type="standard" (default)
+g = molfp.mol_graph("c1ccccc1", type="distance")     # complete graph with 3D distances
+g = molfp.mol_graph("c1ccccc1", type="line")          # bonds as nodes
+g = molfp.mol_graph("c1ccccc1", type="fragment")      # functional groups as nodes
+g = molfp.mol_graph("c1ccccc1", enriched=True)        # enriched atom features (432 dims)
+
+# g["atom_features"]  → numpy (n_nodes, n_features)
+# g["edge_index"]     → numpy (2, n_edges)
+# g["edge_features"]  → numpy (n_edges, n_edge_features)
 
 # Batch conversion
 graphs = molfp.mol_graph(["CCO", "c1ccccc1", "CC(=O)O"])
