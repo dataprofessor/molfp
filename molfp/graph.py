@@ -324,7 +324,7 @@ def _distance_graph_single(smiles_or_mol, enriched=False):
 LINE_NODE_DIM = 2 * ATOM_FEATURE_DIM + EDGE_FEATURE_DIM  # 20+20+12 = 52
 LINE_EDGE_DIM = ATOM_FEATURE_DIM  # shared atom features = 20
 
-def _line_graph_single(smiles_or_mol):
+def _line_graph_single(smiles_or_mol, enriched=False):
     """Line graph where bonds become nodes, connected when sharing an atom."""
     mol = _ensure_mol(smiles_or_mol)
     smiles = Chem.MolToSmiles(mol)
@@ -332,11 +332,21 @@ def _line_graph_single(smiles_or_mol):
     bonds = list(mol.GetBonds())
     n_bonds = len(bonds)
 
+    # Determine atom feature width
+    if enriched:
+        enriched_feats = _enriched_atom_features(mol)
+        af_dim = enriched_feats.shape[1]
+    else:
+        af_dim = ATOM_FEATURE_DIM
+
+    node_dim = 2 * af_dim + EDGE_FEATURE_DIM
+    edge_dim = af_dim
+
     if n_bonds == 0:
         return {
-            "atom_features": np.zeros((0, LINE_NODE_DIM), dtype=np.float32),
+            "atom_features": np.zeros((0, node_dim), dtype=np.float32),
             "edge_index": np.zeros((2, 0), dtype=np.int64),
-            "edge_features": np.zeros((0, LINE_EDGE_DIM), dtype=np.float32),
+            "edge_features": np.zeros((0, edge_dim), dtype=np.float32),
             "num_atoms": 0,
             "num_edges": 0,
             "smiles": smiles,
@@ -344,9 +354,12 @@ def _line_graph_single(smiles_or_mol):
         }
 
     # Precompute atom features
-    atom_feat_map = {}
-    for atom in mol.GetAtoms():
-        atom_feat_map[atom.GetIdx()] = _atom_features(atom)
+    if enriched:
+        atom_feat_map = {i: enriched_feats[i].tolist() for i in range(mol.GetNumAtoms())}
+    else:
+        atom_feat_map = {}
+        for atom in mol.GetAtoms():
+            atom_feat_map[atom.GetIdx()] = _atom_features(atom)
 
     # Bond-node features: [source_atom_feats, dest_atom_feats, bond_feats]
     node_feats = []
@@ -393,7 +406,7 @@ def _line_graph_single(smiles_or_mol):
 
 # ── Fragment graph (functional groups as nodes) ──────────────────────────────
 
-def _fragment_graph_single(smiles_or_mol):
+def _fragment_graph_single(smiles_or_mol, enriched=False):
     """Fragment graph where functional groups are nodes."""
     mol = _ensure_mol(smiles_or_mol)
     smiles = Chem.MolToSmiles(mol)
@@ -401,6 +414,15 @@ def _fragment_graph_single(smiles_or_mol):
     fg_patterns = _get_fg_patterns()
     fg_names = sorted(fg_patterns.keys())
     n_fg_types = len(fg_names)
+
+    # Determine atom feature width
+    if enriched:
+        enriched_feats = _enriched_atom_features(mol)
+        af_dim = enriched_feats.shape[1]
+    else:
+        af_dim = ATOM_FEATURE_DIM
+
+    node_dim = n_fg_types + 1 + af_dim  # one_hot + size + mean_atom_feats
 
     # Find all fragment instances
     fragments = []  # (fg_index, atom_set)
@@ -411,9 +433,12 @@ def _fragment_graph_single(smiles_or_mol):
 
     if not fragments:
         # No recognized functional groups — return single node for whole molecule
-        atom_feats_all = np.array([_atom_features(a) for a in mol.GetAtoms()], dtype=np.float32)
-        mean_feats = np.mean(atom_feats_all, axis=0) if len(atom_feats_all) > 0 else np.zeros(ATOM_FEATURE_DIM)
-        node_feat = np.zeros(n_fg_types + 1 + ATOM_FEATURE_DIM, dtype=np.float32)
+        if enriched:
+            mean_feats = np.mean(enriched_feats, axis=0) if len(enriched_feats) > 0 else np.zeros(af_dim)
+        else:
+            atom_feats_all = np.array([_atom_features(a) for a in mol.GetAtoms()], dtype=np.float32)
+            mean_feats = np.mean(atom_feats_all, axis=0) if len(atom_feats_all) > 0 else np.zeros(af_dim)
+        node_feat = np.zeros(node_dim, dtype=np.float32)
         node_feat[n_fg_types] = mol.GetNumAtoms()
         node_feat[n_fg_types + 1:] = mean_feats
         return {
@@ -427,11 +452,14 @@ def _fragment_graph_single(smiles_or_mol):
         }
 
     # Precompute atom features
-    atom_feat_map = {}
-    for atom in mol.GetAtoms():
-        atom_feat_map[atom.GetIdx()] = np.array(_atom_features(atom), dtype=np.float32)
+    if enriched:
+        atom_feat_map = {i: enriched_feats[i] for i in range(mol.GetNumAtoms())}
+    else:
+        atom_feat_map = {}
+        for atom in mol.GetAtoms():
+            atom_feat_map[atom.GetIdx()] = np.array(_atom_features(atom), dtype=np.float32)
 
-    # Node features: [fg_type_one_hot(20), n_atoms(1), mean_atom_features(20)] = 41
+    # Node features: [fg_type_one_hot, n_atoms, mean_atom_features]
     node_feats = []
     for fg_idx, atom_set in fragments:
         one_hot = [0.0] * n_fg_types
@@ -518,8 +546,8 @@ def mol_graph(input_data, *, column=None, enriched=False, type="standard"):
     builders = {
         "standard": lambda s: _mol_graph_single(s, enriched=enriched),
         "distance": lambda s: _distance_graph_single(s, enriched=enriched),
-        "line": lambda s: _line_graph_single(s),
-        "fragment": lambda s: _fragment_graph_single(s),
+        "line": lambda s: _line_graph_single(s, enriched=enriched),
+        "fragment": lambda s: _fragment_graph_single(s, enriched=enriched),
     }
     build = builders[type]
 

@@ -33,9 +33,9 @@ ACTIVITIES = [4.5, 5.0, 7.2, 6.8, 3.1, 5.5]
 
 class TestCoreFingerprints:
 
-    def test_available_returns_28(self):
+    def test_available_returns_30(self):
         fps = molfp.available()
-        assert len(fps) == 28
+        assert len(fps) == 30
 
     @pytest.mark.parametrize("fp_name,expected_len", [
         ("maccs", 166),
@@ -903,7 +903,8 @@ class TestSklearnTransformers:
     def test_transformers_registry_matches_base_fingerprints(self):
         # Transformers cover the 22 non-graph fingerprints
         graph_fps = {"graph_standard", "graph_distance", "graph_line", "graph_fragment",
-                     "graph_standard_enriched", "graph_distance_enriched"}
+                     "graph_standard_enriched", "graph_distance_enriched",
+                     "graph_line_enriched", "graph_fragment_enriched"}
         fp_names = set(molfp.FINGERPRINTS.keys()) - graph_fps
         assert set(molfp.TRANSFORMERS.keys()) == fp_names
 
