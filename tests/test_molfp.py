@@ -903,6 +903,44 @@ class TestSklearnTransformers:
     def test_transformers_registry_matches_fingerprints(self):
         assert set(molfp.TRANSFORMERS.keys()) == set(molfp.FINGERPRINTS.keys())
 
+    # ── Feature selection (variance_threshold + select_k) ────────────────
+
+    def test_variance_threshold_reduces_dims(self):
+        t = molfp.KlekotaRothTransformer(variance_threshold=0.01)
+        X = t.fit_transform(SMILES_SET)
+        assert X.shape[0] == len(SMILES_SET)
+        assert X.shape[1] < 4860
+
+    def test_select_k_exact_dims(self):
+        t = molfp.ECFPTransformer(select_k=50)
+        y = [0, 0, 1, 1, 0, 1]
+        X = t.fit_transform(SMILES_SET, y)
+        assert X.shape == (len(SMILES_SET), 50)
+
+    def test_variance_and_select_k_combined(self):
+        t = molfp.KlekotaRothTransformer(variance_threshold=0.01, select_k=20)
+        y = [0, 0, 1, 1, 0, 1]
+        X = t.fit_transform(SMILES_SET, y)
+        assert X.shape == (len(SMILES_SET), 20)
+
+    def test_select_k_without_y_skips_selection(self):
+        t = molfp.ECFPTransformer(select_k=50)
+        X = t.fit_transform(SMILES_SET)
+        assert X.shape[1] == 1024
+
+    def test_variance_threshold_base_transformer(self):
+        t = molfp.MACCSTransformer(variance_threshold=0.0)
+        X = t.fit_transform(SMILES_SET)
+        assert X.shape[0] == len(SMILES_SET)
+        assert X.shape[1] <= 166
+
+    def test_feature_selection_transform_after_fit(self):
+        t = molfp.ECFPTransformer(variance_threshold=0.01, select_k=30)
+        y = [0, 0, 1, 1, 0, 1]
+        t.fit(SMILES_SET, y)
+        X = t.transform(SMILES_SET[:3])
+        assert X.shape == (3, 30)
+
 
 # =============================================================================
 # 12. STANDARDIZE
