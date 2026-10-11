@@ -691,6 +691,21 @@ def _register_graph_fingerprints():
         "graph_line": (_graph_line_single, 714, "Graph Line (bonds=nodes)"),
         "graph_fragment": (_graph_fragment_single, 510, "Graph Fragment (functional groups=nodes)"),
     }
+
+    # Enriched versions: Morgan hashes + functional groups + neighbor counts per atom
+    def _graph_standard_enriched_single(smiles_or_mol):
+        g = _mol_graph_single(smiles_or_mol, enriched=True)
+        return graph_to_vector(g).tolist()
+
+    def _graph_distance_enriched_single(smiles_or_mol):
+        g = _distance_graph_single(smiles_or_mol, enriched=True)
+        return graph_to_vector(g).tolist()
+
+    graph_fps.update({
+        "graph_standard_enriched": (_graph_standard_enriched_single, 5242, "Graph Standard Enriched (Morgan + FG + neighbors)"),
+        "graph_distance_enriched": (_graph_distance_enriched_single, 5230, "Graph Distance Enriched (Morgan + FG + neighbors)"),
+    })
+
     FINGERPRINTS.update(graph_fps)
     _GRAPH_FP_REGISTRY.update(graph_fps)
 
