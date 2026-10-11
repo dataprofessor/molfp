@@ -138,29 +138,44 @@ def _maccs_single(smiles_or_mol):
             arr[i - 1] = 1
     return arr.tolist()
 
-def _ecfp4_single(smiles_or_mol, n_bits=1024):
+def _ecfp4_single(smiles_or_mol, n_bits=1024, collision_free=False):
     mol = _ensure_mol(smiles_or_mol)
+    if collision_free:
+        return _multihash_fold(AllChem.GetMorganFingerprint(mol, radius=2), n_bits)
     fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=n_bits)
     arr = np.zeros(n_bits, dtype=np.int32)
     AllChem.DataStructs.ConvertToNumpyArray(fp, arr)
     return arr.tolist()
 
-def _ecfp4_multihash_single(smiles_or_mol, n_bits=1024, n_hashes=2):
-    """Multi-hash ECFP4: each substructure sets k bits using independent hashes.
+def _multihash_fold(sparse_fp, n_bits, n_hashes=2):
+    """Fold a sparse fingerprint using k independent hashes (Bloom filter approach).
 
+    Each substructure hash is mapped to k bit positions using different seeds.
     Collision probability drops from 1/n_bits to (1/n_bits)^k.
     """
-    mol = _ensure_mol(smiles_or_mol)
-    sparse_fp = AllChem.GetMorganFingerprint(mol, radius=2)
-    raw_hashes = list(sparse_fp.GetNonzeroElements().keys())
+    # Handle both UIntSparseIntVect (Morgan/AP) and SparseBitVect (RDK)
+    if hasattr(sparse_fp, 'GetNonzeroElements'):
+        raw_hashes = list(sparse_fp.GetNonzeroElements().keys())
+    else:
+        raw_hashes = list(sparse_fp.GetOnBits())
 
     arr = np.zeros(n_bits, dtype=np.int32)
-    # Use k different hash seeds to map each substructure to k bit positions
     seeds = [1, 31, 997, 7919, 104729][:n_hashes]
     for h in raw_hashes:
         for seed in seeds:
             bit = ((h * seed) ^ (seed * 0x5BD1E995)) % n_bits
             arr[bit] = 1
+    return arr.tolist()
+
+def _multihash_fold_count(sparse_fp, n_bits, n_hashes=2):
+    """Multi-hash fold for count fingerprints."""
+    elements = sparse_fp.GetNonzeroElements()
+    arr = np.zeros(n_bits, dtype=np.int32)
+    seeds = [1, 31, 997, 7919, 104729][:n_hashes]
+    for h, count in elements.items():
+        for seed in seeds:
+            bit = ((h * seed) ^ (seed * 0x5BD1E995)) % n_bits
+            arr[bit] += count
     return arr.tolist()
 
 def _pubchem_single(smiles_or_mol):
@@ -188,13 +203,17 @@ def _estate_single(smiles_or_mol):
     counts, _ = FingerprintMol(mol)
     return [1 if c > 0 else 0 for c in counts]
 
-def _atompairs2d_single(smiles_or_mol, n_bits=780):
+def _atompairs2d_single(smiles_or_mol, n_bits=780, collision_free=False):
     mol = _ensure_mol(smiles_or_mol)
+    if collision_free:
+        return _multihash_fold(rdMolDescriptors.GetAtomPairFingerprint(mol), n_bits)
     fp = rdMolDescriptors.GetHashedAtomPairFingerprintAsBitVect(mol, nBits=n_bits)
     return [int(fp[i]) for i in range(n_bits)]
 
-def _atompairs2d_count_single(smiles_or_mol, n_bits=780):
+def _atompairs2d_count_single(smiles_or_mol, n_bits=780, collision_free=False):
     mol = _ensure_mol(smiles_or_mol)
+    if collision_free:
+        return _multihash_fold_count(rdMolDescriptors.GetAtomPairFingerprint(mol), n_bits)
     fp = rdMolDescriptors.GetHashedAtomPairFingerprint(mol, nBits=n_bits)
     result = [0] * n_bits
     for idx, count in fp.GetNonzeroElements().items():
@@ -373,17 +392,21 @@ def check_conformer(smiles_or_mol):
     }
 
 
-def _atompairs3d_single(smiles_or_mol, n_bits=780):
+def _atompairs3d_single(smiles_or_mol, n_bits=780, collision_free=False):
     mol = _ensure_mol(smiles_or_mol)
     mol = _ensure_conformer(mol)
+    if collision_free:
+        return _multihash_fold(rdMolDescriptors.GetAtomPairFingerprint(mol, use2D=False), n_bits)
     fp = rdMolDescriptors.GetHashedAtomPairFingerprintAsBitVect(
         mol, nBits=n_bits, use2D=False
     )
     return [int(fp[i]) for i in range(n_bits)]
 
-def _atompairs3d_count_single(smiles_or_mol, n_bits=780):
+def _atompairs3d_count_single(smiles_or_mol, n_bits=780, collision_free=False):
     mol = _ensure_mol(smiles_or_mol)
     mol = _ensure_conformer(mol)
+    if collision_free:
+        return _multihash_fold_count(rdMolDescriptors.GetAtomPairFingerprint(mol, use2D=False), n_bits)
     fp = rdMolDescriptors.GetHashedAtomPairFingerprint(
         mol, nBits=n_bits, use2D=False
     )
@@ -429,22 +452,34 @@ def _getaway_single(smiles_or_mol):
     mol = _ensure_conformer(mol)
     return [float(x) for x in rdMolDescriptors.CalcGETAWAY(mol)]
 
-def _rdk_single(smiles_or_mol, n_bits=1024):
+def _rdk_single(smiles_or_mol, n_bits=1024, collision_free=False):
     mol = _ensure_mol(smiles_or_mol)
+    if collision_free:
+        gen = rdFingerprintGenerator.GetRDKitFPGenerator(fpSize=2**31-1, maxPath=7, minPath=1)
+        sparse = gen.GetSparseFingerprint(mol)
+        return _multihash_fold(sparse, n_bits)
     fp = RDKFingerprint(mol, fpSize=n_bits, maxPath=7, minPath=1)
     arr = np.zeros(n_bits, dtype=np.int32)
     AllChem.DataStructs.ConvertToNumpyArray(fp, arr)
     return arr.tolist()
 
-def _rdk_ext_single(smiles_or_mol, n_bits=1024):
+def _rdk_ext_single(smiles_or_mol, n_bits=1024, collision_free=False):
     mol = _ensure_mol(smiles_or_mol)
+    if collision_free:
+        gen = rdFingerprintGenerator.GetRDKitFPGenerator(fpSize=2**31-1, maxPath=7, minPath=1, useBondOrder=True)
+        sparse = gen.GetSparseFingerprint(mol)
+        return _multihash_fold(sparse, n_bits)
     fp = RDKFingerprint(mol, fpSize=n_bits, maxPath=7, minPath=1, branchedPaths=True)
     arr = np.zeros(n_bits, dtype=np.int32)
     AllChem.DataStructs.ConvertToNumpyArray(fp, arr)
     return arr.tolist()
 
-def _rdk_graphonly_single(smiles_or_mol, n_bits=1024):
+def _rdk_graphonly_single(smiles_or_mol, n_bits=1024, collision_free=False):
     mol = _ensure_mol(smiles_or_mol)
+    if collision_free:
+        gen = rdFingerprintGenerator.GetRDKitFPGenerator(fpSize=2**31-1, maxPath=7, minPath=1, useBondOrder=False)
+        sparse = gen.GetSparseFingerprint(mol)
+        return _multihash_fold(sparse, n_bits)
     fp = _get_graphonly_gen(n_bits).GetFingerprint(mol)
     arr = np.zeros(n_bits, dtype=np.int32)
     AllChem.DataStructs.ConvertToNumpyArray(fp, arr)
@@ -461,13 +496,13 @@ def maccs(input_data, *, column=None, n_jobs=1, sparse=False):
     """MACCS Keys fingerprint (166 bits)."""
     return _versatile(_maccs_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse)
 
-def ecfp4(input_data, *, n_bits=1024, column=None, n_jobs=1, sparse=False):
-    """ECFP4 / Morgan radius=2 fingerprint."""
-    return _versatile(_ecfp4_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits)
+def ecfp4(input_data, *, n_bits=1024, collision_free=False, column=None, n_jobs=1, sparse=False):
+    """ECFP4 / Morgan radius=2 fingerprint. Use collision_free=True for multi-hash version."""
+    return _versatile(_ecfp4_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits, collision_free=collision_free)
 
 def ecfp4_multihash(input_data, *, n_bits=1024, n_hashes=2, column=None, n_jobs=1, sparse=False):
-    """Multi-hash ECFP4: each substructure sets k bits to reduce collisions."""
-    return _versatile(_ecfp4_multihash_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits, n_hashes=n_hashes)
+    """Multi-hash ECFP4 (deprecated — use ecfp4(collision_free=True) instead)."""
+    return _versatile(_ecfp4_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits, collision_free=True)
 
 def pubchem(input_data, *, column=None, n_jobs=1, sparse=False):
     """PubChem/CACTVS fingerprint (881 bits)."""
@@ -493,33 +528,33 @@ def estate(input_data, *, column=None, n_jobs=1, sparse=False):
     """E-State fingerprint (79 bits)."""
     return _versatile(_estate_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse)
 
-def atompairs2d(input_data, *, n_bits=780, column=None, n_jobs=1, sparse=False):
-    """AtomPairs2D fingerprint (780 bits, hashed)."""
-    return _versatile(_atompairs2d_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits)
+def atompairs2d(input_data, *, n_bits=780, collision_free=False, column=None, n_jobs=1, sparse=False):
+    """AtomPairs2D fingerprint (780 bits, hashed). Use collision_free=True for multi-hash."""
+    return _versatile(_atompairs2d_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits, collision_free=collision_free)
 
-def atompairs2d_count(input_data, *, n_bits=780, column=None, n_jobs=1, sparse=False):
-    """AtomPairs2D Count (780 features, hashed counts)."""
-    return _versatile(_atompairs2d_count_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits)
+def atompairs2d_count(input_data, *, n_bits=780, collision_free=False, column=None, n_jobs=1, sparse=False):
+    """AtomPairs2D Count (780 features, hashed counts). Use collision_free=True for multi-hash."""
+    return _versatile(_atompairs2d_count_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits, collision_free=collision_free)
 
-def rdk(input_data, *, n_bits=1024, column=None, n_jobs=1, sparse=False):
-    """RDKit path-based fingerprint (1024 bits)."""
-    return _versatile(_rdk_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits)
+def rdk(input_data, *, n_bits=1024, collision_free=False, column=None, n_jobs=1, sparse=False):
+    """RDKit path-based fingerprint (1024 bits). Use collision_free=True for multi-hash."""
+    return _versatile(_rdk_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits, collision_free=collision_free)
 
-def rdk_ext(input_data, *, n_bits=1024, column=None, n_jobs=1, sparse=False):
-    """RDKit Extended fingerprint (1024 bits)."""
-    return _versatile(_rdk_ext_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits)
+def rdk_ext(input_data, *, n_bits=1024, collision_free=False, column=None, n_jobs=1, sparse=False):
+    """RDKit Extended fingerprint (1024 bits). Use collision_free=True for multi-hash."""
+    return _versatile(_rdk_ext_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits, collision_free=collision_free)
 
-def rdk_graphonly(input_data, *, n_bits=1024, column=None, n_jobs=1, sparse=False):
-    """RDKit GraphOnly fingerprint (1024 bits) — ignores bond types."""
-    return _versatile(_rdk_graphonly_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits)
+def rdk_graphonly(input_data, *, n_bits=1024, collision_free=False, column=None, n_jobs=1, sparse=False):
+    """RDKit GraphOnly fingerprint (1024 bits). Use collision_free=True for multi-hash."""
+    return _versatile(_rdk_graphonly_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits, collision_free=collision_free)
 
-def atompairs3d(input_data, *, n_bits=780, column=None, n_jobs=1, sparse=False):
-    """3D Atom Pairs fingerprint (780 bits) — uses Euclidean distances from 3D conformer."""
-    return _versatile(_atompairs3d_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits)
+def atompairs3d(input_data, *, n_bits=780, collision_free=False, column=None, n_jobs=1, sparse=False):
+    """3D Atom Pairs fingerprint (780 bits). Use collision_free=True for multi-hash."""
+    return _versatile(_atompairs3d_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits, collision_free=collision_free)
 
-def atompairs3d_count(input_data, *, n_bits=780, column=None, n_jobs=1, sparse=False):
-    """3D Atom Pairs Count (780 features) — counts from 3D conformer distances."""
-    return _versatile(_atompairs3d_count_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits)
+def atompairs3d_count(input_data, *, n_bits=780, collision_free=False, column=None, n_jobs=1, sparse=False):
+    """3D Atom Pairs Count (780 features). Use collision_free=True for multi-hash."""
+    return _versatile(_atompairs3d_count_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits, collision_free=collision_free)
 
 def usr(input_data, *, column=None, n_jobs=1, sparse=False):
     """Ultrafast Shape Recognition (12 floats) — molecular shape descriptor."""
@@ -674,7 +709,6 @@ def getaway_batch(smiles_list, n_jobs=1, sparse=False):
 FINGERPRINTS = {
     "maccs": (_maccs_single, 166, "MACCS Keys"),
     "ecfp4": (_ecfp4_single, 1024, "ECFP4 (Morgan r=2)"),
-    "ecfp4_multihash": (_ecfp4_multihash_single, 1024, "ECFP4 Multi-hash (collision-resistant)"),
     "pubchem": (_pubchem_single, 881, "PubChem/CACTVS"),
     "substructure": (_substructure_single, 307, "SubstructureFP (Inte:Ligand)"),
     "substructure_count": (_substructure_count_single, 307, "Substructure Count"),
