@@ -256,7 +256,7 @@ def _mol_to_graph_single(smiles_or_mol, enriched=False):
     }
 
 
-def mol_to_graph(input_data, *, column=None, enriched=False):
+def mol_to_graph(input_data, *, column=None, enriched=False, kind="standard"):
     """Convert molecule(s) to graph representation(s) for deep learning.
 
     Args:
@@ -264,11 +264,19 @@ def mol_to_graph(input_data, *, column=None, enriched=False):
         column: column name for DataFrame input.
         enriched: if True, add Morgan hashes, functional group membership,
             and neighbor counts per atom (432 dims vs 20 base dims).
+        kind: graph type — "standard" (atoms=nodes, bonds=edges).
+            Future: "distance", "line", "fragment".
 
     Returns:
         Single molecule: dict with atom_features, edge_index, edge_features.
         Multiple molecules: list of dicts.
     """
+    _VALID_KINDS = ("standard", "distance", "line", "fragment")
+    if kind not in _VALID_KINDS:
+        raise ValueError(f"Unknown kind={kind!r}. Available: {_VALID_KINDS}")
+    if kind != "standard":
+        raise NotImplementedError(f"kind={kind!r} is planned but not yet implemented. Use kind='standard'.")
+
     data, is_batch = _extract_smiles(input_data, column=column)
 
     if not is_batch:
@@ -509,7 +517,7 @@ def graph_to_vector(graph_dict):
 GRAPH_VECTOR_DIM = 4 * ATOM_FEATURE_DIM + 4 * ATOM_FEATURE_DIM + 2 * ATOM_FEATURE_DIM + 2 * ATOM_FEATURE_DIM + 2 * EDGE_FEATURE_DIM + 2 * EDGE_FEATURE_DIM + 10  # 298
 
 
-def graph_vectors(input_data, *, column=None, enriched=False):
+def graph_vectors(input_data, *, column=None, enriched=False, kind="standard"):
     """Convert molecule(s) to fixed-length graph feature vectors for sklearn.
 
     Args:
@@ -517,11 +525,19 @@ def graph_vectors(input_data, *, column=None, enriched=False):
         column: column name for DataFrame input.
         enriched: if True, use enriched atom features (Morgan hashes +
             functional groups + neighbor counts) for richer aggregation.
+        kind: graph type — "standard" (atoms=nodes, bonds=edges).
+            Future: "distance", "line", "fragment".
 
     Returns:
         Single molecule: numpy array
         Multiple molecules: numpy array (n_samples, n_features)
     """
+    _VALID_KINDS = ("standard", "distance", "line", "fragment")
+    if kind not in _VALID_KINDS:
+        raise ValueError(f"Unknown kind={kind!r}. Available: {_VALID_KINDS}")
+    if kind != "standard":
+        raise NotImplementedError(f"kind={kind!r} is planned but not yet implemented. Use kind='standard'.")
+
     data, is_batch = _extract_smiles(input_data, column=column)
 
     if not is_batch:

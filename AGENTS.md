@@ -4,14 +4,23 @@
 
 ### Additional Molecular Graph Types
 
-Currently `mol_to_graph()` produces a standard molecular graph (atoms as nodes, bonds as edges). The following graph types are used by different GNN architectures and could be added:
+`mol_to_graph()` and `graph_vectors()` use a `kind` parameter to select the graph type:
 
-1. **Complete/Distance graph** — every atom pair connected, edge weight = 3D distance. Used by SchNet, DimeNet, SphereNet. We already have `_ensure_conformer()` for 3D coordinates.
+```python
+molfp.mol_to_graph(smiles, kind="standard")    # current — atoms=nodes, bonds=edges
+molfp.mol_to_graph(smiles, kind="distance")    # all atom pairs, 3D distance weights
+molfp.mol_to_graph(smiles, kind="line")        # bonds=nodes, bond-bond connections
+molfp.mol_to_graph(smiles, kind="fragment")    # functional groups=nodes
+```
 
-2. **Line graph** — bonds become nodes, connected when they share an atom. Used by D-MPNN (Chemprop). Each node carries both bond features and source atom features.
+Currently implemented: `kind="standard"` (default).
 
-3. **Fragment graph** — functional groups as nodes, connections between groups as edges. We already have 307 substructure SMARTS and 20 functional group SMARTS that could define the fragments.
+Planned:
 
-4. **Atom+Bond graph** — both atoms and bonds as nodes in a bipartite-like structure. Used by AttentiveFP.
+1. **`kind="distance"`** — complete graph where every atom pair is connected, edge weight = 3D Euclidean distance. Used by SchNet, DimeNet, SphereNet. We already have `_ensure_conformer()` for 3D coordinates.
 
-Priority: complete/distance graph and line graph are most widely used in practice.
+2. **`kind="line"`** — line graph where bonds become nodes, connected when they share an atom. Each node carries both bond features and source atom features. Used by D-MPNN (Chemprop).
+
+3. **`kind="fragment"`** — coarse-grained graph where functional groups are nodes, edges represent connections between groups. We already have 307 substructure SMARTS and 20 functional group SMARTS that could define the fragments.
+
+Priority: distance and line graphs are most widely used in practice.
