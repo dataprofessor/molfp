@@ -540,55 +540,35 @@ class GraphTransformer:
     Args:
         enriched: if True, use enriched atom features with Morgan hashes,
             functional group membership, and neighbor counts.
-        select_k: if set, apply variance-threshold filtering followed by
-            mutual-information selection to keep the top k features.
-            Requires y during fit(). Recommended: 500-1000 for enriched.
+
+    For feature selection, use standalone functions after transforming:
+        X = molfp.GraphTransformer(enriched=True).fit_transform(smiles)
+        result = molfp.select_features(X, y, k=500, threshold=0.01)
 
     Example:
         pipe = make_pipeline(
-            molfp.GraphTransformer(enriched=True, select_k=500),
+            molfp.GraphTransformer(enriched=True),
             RandomForestClassifier()
         )
         pipe.fit(smiles_train, y_train)
     """
 
-    def __init__(self, enriched=False, select_k=None):
+    def __init__(self, enriched=False):
         self.enriched = enriched
-        self.select_k = select_k
-        self._selector = None
 
     def fit(self, X, y=None):
-        if self.select_k is not None and y is not None:
-            from sklearn.feature_selection import (
-                VarianceThreshold, SelectKBest, mutual_info_classif,
-            )
-            X_raw = graph_vectors(X, enriched=self.enriched)
-            # Step 1: remove zero-variance features
-            vt = VarianceThreshold()
-            X_var = vt.fit_transform(X_raw)
-            # Step 2: select top-k by mutual information
-            k = min(self.select_k, X_var.shape[1])
-            mi = SelectKBest(mutual_info_classif, k=k)
-            mi.fit(X_var, y)
-            self._selector = (vt, mi)
         return self
 
     def transform(self, X):
-        X_raw = graph_vectors(X, enriched=self.enriched)
-        if self._selector is not None:
-            vt, mi = self._selector
-            X_raw = vt.transform(X_raw)
-            X_raw = mi.transform(X_raw)
-        return X_raw
+        return graph_vectors(X, enriched=self.enriched)
 
     def get_params(self, deep=True):
-        return {"enriched": self.enriched, "select_k": self.select_k}
+        return {"enriched": self.enriched}
 
     def set_params(self, **params):
-        for k, v in params.items():
-            setattr(self, k, v)
+        if "enriched" in params:
+            self.enriched = params["enriched"]
         return self
 
     def fit_transform(self, X, y=None):
-        self.fit(X, y)
         return self.transform(X)
