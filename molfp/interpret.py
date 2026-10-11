@@ -103,7 +103,8 @@ def _chemical_meaning(smarts_str):
 
 
 def interpret(smiles_list: list[str], activities: list[float] | np.ndarray, fp_type: str = "maccs", metric: str = "pchembl",
-              thresholds: dict[str, float] | None = None, model: Any = None, top_n: int = 20, n_background: int = 50) -> dict[str, Any]:
+              thresholds: dict[str, float] | None = None, model: Any = None, top_n: int = 20, n_background: int = 50,
+              collision_aware: bool = False) -> dict[str, Any]:
     """Full interpretation pipeline: FP → model → SHAP → chemical meaning.
 
     Args:
@@ -115,6 +116,7 @@ def interpret(smiles_list: list[str], activities: list[float] | np.ndarray, fp_t
         model: sklearn classifier (default: RandomForestClassifier)
         top_n: number of top features to return
         n_background: SHAP background samples
+        collision_aware: if True, detect collisions and flag ambiguous SHAP bits
 
     Returns:
         dict with:
@@ -255,6 +257,44 @@ def interpret(smiles_list: list[str], activities: list[float] | np.ndarray, fp_t
 
         class_drivers[cls_name] = sorted(drivers, key=lambda d: abs(d["mean_shap"]), reverse=True)
 
+    # ── Collision-aware: flag ambiguous bits ──────────────────────────
+    collision_info = {}
+    if collision_aware:
+        from .collisions import detect_collisions
+        # Aggregate collisions across all molecules
+        all_colliding_bits = {}
+        for smi in smiles_list:
+            try:
+                coll = detect_collisions(smi, fp_type, n_bits)
+                for bit, hashes in coll.items():
+                    if bit not in all_colliding_bits:
+                        all_colliding_bits[bit] = set()
+                    all_colliding_bits[bit].update(hashes)
+            except (ValueError, Exception):
+                continue
+
+        collision_info = {bit: len(hashes) for bit, hashes in all_colliding_bits.items()}
+
+        # Annotate feature_importance with collision status
+        for item in feature_importance:
+            bit = item["bit"]
+            if bit in collision_info:
+                item["collision"] = True
+                item["n_colliding_hashes"] = collision_info[bit]
+                item["interpretation_note"] = f"AMBIGUOUS: {collision_info[bit]} substructures share this bit"
+            else:
+                item["collision"] = False
+
+        # Annotate class_drivers with collision status
+        for cls_name, drivers in class_drivers.items():
+            for d in drivers:
+                bit = d["bit"]
+                if bit in collision_info:
+                    d["collision"] = True
+                    d["n_colliding_hashes"] = collision_info[bit]
+                else:
+                    d["collision"] = False
+
     return {
         "shap_values": shap_values,
         "feature_importance": feature_importance,
@@ -265,6 +305,7 @@ def interpret(smiles_list: list[str], activities: list[float] | np.ndarray, fp_t
         "fp_type": fp_type,
         "n_bits": n_bits,
         "accuracy": float(model.score(X, y)),
+        "collision_info": collision_info,
     }
 
 

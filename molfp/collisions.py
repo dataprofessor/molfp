@@ -175,3 +175,45 @@ def collision_pairs(smiles_list: list[Union[str, Chem.rdchem.Mol]], fp_type: str
                     pairs.append((members[j][1], members[k][1], members[j][0], members[k][0]))
 
     return pairs
+
+
+def remove_collisions(X, smiles_list, fp_type="ecfp4", n_bits=1024):
+    """Remove columns (bits) that have hash collisions in the dataset.
+
+    Scans all molecules for colliding bits, builds a collision-free mask,
+    and returns the filtered feature matrix.
+
+    Args:
+        X: numpy array (n_samples, n_bits) — fingerprint matrix.
+        smiles_list: list of SMILES (same order as X rows).
+        fp_type: hashed fingerprint type ("ecfp4", "atompairs2d", "rdk", etc.).
+        n_bits: bit size used to compute X.
+
+    Returns:
+        dict with:
+            X: filtered array (n_samples, n_clean_bits)
+            mask: boolean mask of collision-free bits
+            n_removed: number of colliding bits removed
+            n_remaining: number of clean bits kept
+            colliding_bits: set of bit indices that had collisions
+    """
+    colliding_bits = set()
+    for smi in smiles_list:
+        try:
+            coll = detect_collisions(smi, fp_type, n_bits)
+            colliding_bits.update(coll.keys())
+        except (ValueError, Exception):
+            continue
+
+    mask = np.ones(X.shape[1], dtype=bool)
+    for bit in colliding_bits:
+        if bit < X.shape[1]:
+            mask[bit] = False
+
+    return {
+        "X": X[:, mask],
+        "mask": mask,
+        "n_removed": int(np.sum(~mask)),
+        "n_remaining": int(np.sum(mask)),
+        "colliding_bits": colliding_bits,
+    }

@@ -42,6 +42,7 @@ __version__ = "0.3.0"
 from .fingerprints import (
     maccs,
     ecfp4,
+    ecfp4_multihash,
     pubchem,
     substructure,
     substructure_count,
@@ -94,7 +95,7 @@ from .fingerprints import (
 # ── Novel analysis modules ────────────────────────────────────────────────────
 from .explain import explain
 from .annotate import annotate, get_annotations
-from .collisions import detect_collisions, collision_rate, collision_pairs
+from .collisions import detect_collisions, collision_rate, collision_pairs, remove_collisions
 from .similarity import similarity_matrix, similarity_profile, compare_fps
 from .cliffs import activity_cliffs, cliff_summary
 from .fusion import fuse, complementarity

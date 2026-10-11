@@ -145,6 +145,24 @@ def _ecfp4_single(smiles_or_mol, n_bits=1024):
     AllChem.DataStructs.ConvertToNumpyArray(fp, arr)
     return arr.tolist()
 
+def _ecfp4_multihash_single(smiles_or_mol, n_bits=1024, n_hashes=2):
+    """Multi-hash ECFP4: each substructure sets k bits using independent hashes.
+
+    Collision probability drops from 1/n_bits to (1/n_bits)^k.
+    """
+    mol = _ensure_mol(smiles_or_mol)
+    sparse_fp = AllChem.GetMorganFingerprint(mol, radius=2)
+    raw_hashes = list(sparse_fp.GetNonzeroElements().keys())
+
+    arr = np.zeros(n_bits, dtype=np.int32)
+    # Use k different hash seeds to map each substructure to k bit positions
+    seeds = [1, 31, 997, 7919, 104729][:n_hashes]
+    for h in raw_hashes:
+        for seed in seeds:
+            bit = ((h * seed) ^ (seed * 0x5BD1E995)) % n_bits
+            arr[bit] = 1
+    return arr.tolist()
+
 def _pubchem_single(smiles_or_mol):
     mol = _ensure_mol(smiles_or_mol)
     return _get_pubchem_computer().compute(mol)
@@ -447,6 +465,10 @@ def ecfp4(input_data, *, n_bits=1024, column=None, n_jobs=1, sparse=False):
     """ECFP4 / Morgan radius=2 fingerprint."""
     return _versatile(_ecfp4_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits)
 
+def ecfp4_multihash(input_data, *, n_bits=1024, n_hashes=2, column=None, n_jobs=1, sparse=False):
+    """Multi-hash ECFP4: each substructure sets k bits to reduce collisions."""
+    return _versatile(_ecfp4_multihash_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits, n_hashes=n_hashes)
+
 def pubchem(input_data, *, column=None, n_jobs=1, sparse=False):
     """PubChem/CACTVS fingerprint (881 bits)."""
     return _versatile(_pubchem_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse)
@@ -652,6 +674,7 @@ def getaway_batch(smiles_list, n_jobs=1, sparse=False):
 FINGERPRINTS = {
     "maccs": (_maccs_single, 166, "MACCS Keys"),
     "ecfp4": (_ecfp4_single, 1024, "ECFP4 (Morgan r=2)"),
+    "ecfp4_multihash": (_ecfp4_multihash_single, 1024, "ECFP4 Multi-hash (collision-resistant)"),
     "pubchem": (_pubchem_single, 881, "PubChem/CACTVS"),
     "substructure": (_substructure_single, 307, "SubstructureFP (Inte:Ligand)"),
     "substructure_count": (_substructure_count_single, 307, "Substructure Count"),
