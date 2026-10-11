@@ -105,9 +105,6 @@ def complementarity(smiles_list: list[str], fp_types: list[str] | None = None, s
     corr = np.zeros((n, n))
     for i in range(n):
         for j in range(n):
-            a = (fps_dict[fp_types[i]] > 0).any(axis=0)
-            b = (fps_dict[fp_types[j]] > 0).any(axis=0)
-            # Compute correlation of bit-density profiles across molecules
             density_i = fps_dict[fp_types[i]].mean(axis=1)
             density_j = fps_dict[fp_types[j]].mean(axis=1)
             if np.std(density_i) > 0 and np.std(density_j) > 0:

@@ -43,23 +43,25 @@ def activity_cliffs(smiles_list: list[str], activities: list[float] | np.ndarray
 
     mat = similarity_matrix(smiles_list, fp_type, metric)
 
+    # Vectorized: find all pairs exceeding both thresholds
+    triu_i, triu_j = np.triu_indices(n, k=1)
+    sims = mat[triu_i, triu_j]
+    deltas = np.abs(activities[triu_i] - activities[triu_j])
+    mask = (sims >= sim_threshold) & (deltas >= activity_threshold)
+
     cliffs = []
-    for i in range(n):
-        for j in range(i + 1, n):
-            sim = mat[i, j]
-            if sim >= sim_threshold:
-                delta = abs(activities[i] - activities[j])
-                if delta >= activity_threshold:
-                    cliffs.append({
-                        "idx_a": i,
-                        "idx_b": j,
-                        "smiles_a": smiles_list[i],
-                        "smiles_b": smiles_list[j],
-                        "similarity": float(sim),
-                        "activity_a": float(activities[i]),
-                        "activity_b": float(activities[j]),
-                        "delta_activity": float(delta),
-                    })
+    for idx in np.where(mask)[0]:
+        i, j = int(triu_i[idx]), int(triu_j[idx])
+        cliffs.append({
+            "idx_a": i,
+            "idx_b": j,
+            "smiles_a": smiles_list[i],
+            "smiles_b": smiles_list[j],
+            "similarity": float(sims[idx]),
+            "activity_a": float(activities[i]),
+            "activity_b": float(activities[j]),
+            "delta_activity": float(deltas[idx]),
+        })
 
     return sorted(cliffs, key=lambda c: c["delta_activity"], reverse=True)
 

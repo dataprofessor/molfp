@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Union
 
 import numpy as np
+from sklearn.base import BaseEstimator, TransformerMixin
 from rdkit import Chem
 from rdkit.Chem import rdchem, AllChem, rdMolDescriptors
 
@@ -821,41 +822,25 @@ def graph_vectors(input_data, *, column=None, enriched=False, type="standard"):
 
 # ── sklearn transformer ──────────────────────────────────────────────────────
 
-class GraphTransformer:
+class GraphTransformer(BaseEstimator, TransformerMixin):
     """sklearn-compatible transformer for molecular graph features.
 
     Args:
         enriched: if True, use enriched atom features with Morgan hashes,
             functional group membership, and neighbor counts.
+        type: graph type — "standard", "distance", "line", "fragment".
 
     For feature selection, use standalone functions after transforming:
         X = molfp.GraphTransformer(enriched=True).fit_transform(smiles)
         result = molfp.select_features(X, y, k=500, threshold=0.01)
-
-    Example:
-        pipe = make_pipeline(
-            molfp.GraphTransformer(enriched=True),
-            RandomForestClassifier()
-        )
-        pipe.fit(smiles_train, y_train)
     """
 
-    def __init__(self, enriched=False):
+    def __init__(self, enriched=False, type="standard"):
         self.enriched = enriched
+        self.type = type
 
     def fit(self, X, y=None):
         return self
 
     def transform(self, X):
-        return graph_vectors(X, enriched=self.enriched)
-
-    def get_params(self, deep=True):
-        return {"enriched": self.enriched}
-
-    def set_params(self, **params):
-        if "enriched" in params:
-            self.enriched = params["enriched"]
-        return self
-
-    def fit_transform(self, X, y=None):
-        return self.transform(X)
+        return graph_vectors(X, enriched=self.enriched, type=self.type)

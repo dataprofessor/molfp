@@ -2,7 +2,7 @@
 
 **Interpretable molecular fingerprints with SHAP-driven chemical explanations.**
 
-A native Python/RDKit library that computes 22 molecular fingerprint types (13 2D + 9 3D) and provides built-in tools for interpretation, visualization, collision detection, activity cliff analysis, bioactivity profiling, and SHAP-based feature explanation — capabilities not found in any other fingerprint library.
+A native Python/RDKit library that computes 30 molecular fingerprint types (13 2D + 9 3D + 8 graph-based) and provides built-in tools for interpretation, visualization, collision detection, activity cliff analysis, bioactivity profiling, and SHAP-based feature explanation — capabilities not found in any other fingerprint library.
 
 ## Install
 
@@ -285,8 +285,8 @@ molfp.edge_feature_names()  # ['bond_type_single', ..., 'is_conjugated', 'in_rin
 
 | Feature | molfp | skfp |
 |---------|-------|------|
-| Fingerprint types | 22 (13 2D + 9 3D) | 35 |
-| Bit-level explainability | All 22 FPs | None |
+| Fingerprint types | 30 (13 2D + 9 3D + 8 graph) | 35 |
+| Bit-level explainability | 13 2D FPs | None |
 | Chemical annotation | Built-in | Feature names only |
 | SHAP + chemical meaning | `interpret()` | None |
 | Hash collision detection | `detect_collisions()` | None |

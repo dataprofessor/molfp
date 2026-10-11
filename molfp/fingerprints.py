@@ -25,6 +25,7 @@ from ._pubchem import PubChemComputer
 MolInput = Union[str, Chem.rdchem.Mol]
 
 _cache = {}
+_conformer_cache = {}  # SMILES → Mol with conformer
 
 
 def _ensure_mol(smiles_or_mol):
@@ -117,12 +118,13 @@ def _get_pubchem_computer():
     return _cache["pubchem"]
 
 
-def _get_graphonly_gen():
-    if "graphonly_gen" not in _cache:
-        _cache["graphonly_gen"] = rdFingerprintGenerator.GetRDKitFPGenerator(
-            fpSize=1024, maxPath=7, minPath=1, useBondOrder=False,
+def _get_graphonly_gen(n_bits=1024):
+    key = f"graphonly_gen_{n_bits}"
+    if key not in _cache:
+        _cache[key] = rdFingerprintGenerator.GetRDKitFPGenerator(
+            fpSize=n_bits, maxPath=7, minPath=1, useBondOrder=False,
         )
-    return _cache["graphonly_gen"]
+    return _cache[key]
 
 
 # ── Single-molecule core functions (private) ──────────────────────────────────
@@ -130,12 +132,18 @@ def _get_graphonly_gen():
 def _maccs_single(smiles_or_mol):
     mol = _ensure_mol(smiles_or_mol)
     fp = MACCSkeys.GenMACCSKeys(mol)
-    return [int(fp[i]) for i in range(1, 167)]
+    arr = np.zeros(166, dtype=np.int32)
+    for i in fp.GetOnBits():
+        if 1 <= i <= 166:
+            arr[i - 1] = 1
+    return arr.tolist()
 
 def _ecfp4_single(smiles_or_mol, n_bits=1024):
     mol = _ensure_mol(smiles_or_mol)
     fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=n_bits)
-    return [int(fp[i]) for i in range(n_bits)]
+    arr = np.zeros(n_bits, dtype=np.int32)
+    AllChem.DataStructs.ConvertToNumpyArray(fp, arr)
+    return arr.tolist()
 
 def _pubchem_single(smiles_or_mol):
     mol = _ensure_mol(smiles_or_mol)
@@ -232,20 +240,8 @@ def _classify_molecule(mol):
     return "standard"
 
 
-def _ensure_conformer(mol):
-    """Add an optimized 3D conformer if the molecule doesn't have one.
-
-    Routes molecules to the best strategy based on their characteristics:
-      standard  → ETKDG + MMFF (adaptive iterations)
-      metal     → ETKDG + UFF (skip MMFF — no metal parameters)
-      large     → ETKDGv3 (better macrocycle handling) + MMFF (high iterations)
-      metal_large → ETKDGv3 + UFF
-
-    Sets mol property '_conformer_status' to one of:
-      'converged_mmff', 'converged_uff', 'not_converged',
-      'embed_failed', 'preexisting'
-    And '_mol_class' to the routing decision.
-    """
+def _ensure_conformer_impl(mol):
+    """Core conformer generation logic (called by _ensure_conformer with caching)."""
     if mol.GetNumConformers() > 0:
         mol.SetProp("_conformer_status", "preexisting")
         return mol
@@ -320,6 +316,24 @@ def _ensure_conformer(mol):
 
     mol.SetProp("_mol_class", mol_class)
     return mol
+
+
+def _ensure_conformer(mol):
+    """Add optimized 3D conformer with caching by canonical SMILES."""
+    # Check cache
+    try:
+        smi = Chem.MolToSmiles(mol)
+        if smi in _conformer_cache:
+            return _conformer_cache[smi]
+    except Exception:
+        smi = None
+
+    result = _ensure_conformer_impl(mol)
+
+    # Cache result
+    if smi and result.GetNumConformers() > 0 and len(_conformer_cache) < 10000:
+        _conformer_cache[smi] = result
+    return result
 
 
 def check_conformer(smiles_or_mol):
@@ -400,17 +414,23 @@ def _getaway_single(smiles_or_mol):
 def _rdk_single(smiles_or_mol, n_bits=1024):
     mol = _ensure_mol(smiles_or_mol)
     fp = RDKFingerprint(mol, fpSize=n_bits, maxPath=7, minPath=1)
-    return [int(fp[i]) for i in range(n_bits)]
+    arr = np.zeros(n_bits, dtype=np.int32)
+    AllChem.DataStructs.ConvertToNumpyArray(fp, arr)
+    return arr.tolist()
 
 def _rdk_ext_single(smiles_or_mol, n_bits=1024):
     mol = _ensure_mol(smiles_or_mol)
     fp = RDKFingerprint(mol, fpSize=n_bits, maxPath=7, minPath=1, branchedPaths=True)
-    return [int(fp[i]) for i in range(n_bits)]
+    arr = np.zeros(n_bits, dtype=np.int32)
+    AllChem.DataStructs.ConvertToNumpyArray(fp, arr)
+    return arr.tolist()
 
 def _rdk_graphonly_single(smiles_or_mol, n_bits=1024):
     mol = _ensure_mol(smiles_or_mol)
-    fp = _get_graphonly_gen().GetFingerprint(mol)
-    return [int(fp[i]) for i in range(n_bits)]
+    fp = _get_graphonly_gen(n_bits).GetFingerprint(mol)
+    arr = np.zeros(n_bits, dtype=np.int32)
+    AllChem.DataStructs.ConvertToNumpyArray(fp, arr)
+    return arr.tolist()
 
 
 # ── 13 Versatile Fingerprint Functions ────────────────────────────────────────
@@ -509,11 +529,6 @@ def getaway(input_data, *, column=None, n_jobs=1, sparse=False):
 
 
 # ── Batch helpers ─────────────────────────────────────────────────────────────
-
-def _compute_one(args):
-    """Worker function for parallel computation. Must be top-level for pickling."""
-    fn, smiles_or_mol = args
-    return fn(smiles_or_mol)
 
 
 def _batch(fn, smiles_list, n_jobs=1, sparse=False):

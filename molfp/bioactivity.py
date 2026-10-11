@@ -185,17 +185,12 @@ def enriched_bits(smiles_list: list[str], labels: list[str], fp_type: str = "ecf
         class_fps = fps[idx]
         class_freq = class_fps.mean(axis=0)
 
-        enriched = []
-        for bit in range(n_bits):
-            if overall_freq[bit] > 0:
-                ratio = class_freq[bit] / overall_freq[bit]
-                if ratio >= min_enrichment and class_freq[bit] > 0:
-                    enriched.append((
-                        bit,
-                        float(class_freq[bit]),
-                        float(overall_freq[bit]),
-                        float(ratio),
-                    ))
+        # Vectorized enrichment computation
+        with np.errstate(divide='ignore', invalid='ignore'):
+            ratios = np.where(overall_freq > 0, class_freq / overall_freq, 0.0)
+        mask = (ratios >= min_enrichment) & (class_freq > 0)
+        bits = np.where(mask)[0]
+        enriched = [(int(b), float(class_freq[b]), float(overall_freq[b]), float(ratios[b])) for b in bits]
 
         result[cls] = sorted(enriched, key=lambda x: -x[3])
 

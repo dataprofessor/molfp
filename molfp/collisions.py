@@ -150,13 +150,19 @@ def collision_pairs(smiles_list: list[Union[str, Chem.rdchem.Mol]], fp_type: str
 
     Returns list of (smiles_a, smiles_b, idx_a, idx_b) tuples.
     """
-    from .fingerprints import FINGERPRINTS, _ensure_mol
+    from .fingerprints import FINGERPRINTS
+
     fn = FINGERPRINTS[fp_type][0]
+    default_bits = FINGERPRINTS[fp_type][1]
+    # Pass n_bits if the function accepts it and it differs from default
+    import inspect
+    sig = inspect.signature(fn)
+    use_nbits = "n_bits" in sig.parameters
 
     fps = {}
     for i, smi in enumerate(smiles_list):
         try:
-            fp = tuple(fn(smi))
+            fp = tuple(fn(smi, n_bits=n_bits)) if use_nbits else tuple(fn(smi))
             fps.setdefault(fp, []).append((i, smi))
         except (ValueError, Exception):
             continue

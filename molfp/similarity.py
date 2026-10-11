@@ -34,6 +34,18 @@ def similarity_profile(smiles_list: list[str], fp_type: str = "ecfp4",
     mat = similarity_matrix(smiles_list, fp_type, metric)
     n = len(smiles_list)
 
+    if n < 2:
+        return {
+            "fp_type": fp_type,
+            "n_molecules": n,
+            "n_pairs": 0,
+            "mean": 0.0, "std": 0.0, "median": 0.0,
+            "min": 0.0, "max": 0.0, "q25": 0.0, "q75": 0.0,
+            "histogram": [0] * 20,
+            "bin_edges": np.linspace(0, 1, 21).tolist(),
+            "pathological": True,
+        }
+
     triu_idx = np.triu_indices(n, k=1)
     pw = mat[triu_idx]
 

@@ -96,8 +96,7 @@ def _chemical_meaning(smarts_str):
     if meaning_parts:
         return "; ".join(meaning_parts)
 
-    # Fallback: describe the pattern structure
-    n_atoms = smarts_str.count("[") + smarts_str.count("~") - smarts_str.count("[") + 1
+    # Fallback
     if "1" in smarts_str:
         return "ring-containing substructure"
     return "substructure pattern"
@@ -290,15 +289,6 @@ def interpret_molecule(smiles: str, interpretation_result: dict[str, Any]) -> di
     pred_idx = model.predict(fp)[0]
     pred_proba = model.predict_proba(fp)[0]
     pred_class = label_set[pred_idx]
-
-    # Get SHAP for this molecule
-    import shap
-    bg = interpretation_result["shap_values"]
-    if isinstance(bg, list):
-        # Use the SHAP values for the predicted class
-        n_bits = len(bg[0][0]) if len(bg) > 0 and len(bg[0]) > 0 else 0
-    else:
-        n_bits = bg.shape[1] if len(bg.shape) > 1 else 0
 
     # Explain which atoms set which bits
     bit_atoms = explain_bits(smiles, fp_type)
