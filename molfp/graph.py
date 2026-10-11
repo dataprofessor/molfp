@@ -212,7 +212,7 @@ def _edge_features(bond):
 
 # ── Core graph conversion ────────────────────────────────────────────────────
 
-def _mol_to_graph_single(smiles_or_mol, enriched=False):
+def _mol_graph_single(smiles_or_mol, enriched=False):
     """Convert a single molecule to a graph dict."""
     mol = _ensure_mol(smiles_or_mol)
     smiles = Chem.MolToSmiles(mol)
@@ -256,7 +256,7 @@ def _mol_to_graph_single(smiles_or_mol, enriched=False):
     }
 
 
-def mol_to_graph(input_data, *, column=None, enriched=False, type="standard"):
+def mol_graph(input_data, *, column=None, enriched=False, type="standard"):
     """Convert molecule(s) to graph representation(s) for deep learning.
 
     Args:
@@ -280,9 +280,9 @@ def mol_to_graph(input_data, *, column=None, enriched=False, type="standard"):
     data, is_batch = _extract_smiles(input_data, column=column)
 
     if not is_batch:
-        return _mol_to_graph_single(data, enriched=enriched)
+        return _mol_graph_single(data, enriched=enriched)
 
-    return [_mol_to_graph_single(s, enriched=enriched) for s in data]
+    return [_mol_graph_single(s, enriched=enriched) for s in data]
 
 
 # ── PyTorch Geometric converter ──────────────────────────────────────────────
@@ -293,7 +293,7 @@ def to_pyg(graph_dict, y=None):
     Requires: pip install torch torch_geometric
 
     Args:
-        graph_dict: output of mol_to_graph() for a single molecule.
+        graph_dict: output of mol_graph() for a single molecule.
         y: optional label (int, float, or tensor).
 
     Returns:
@@ -327,7 +327,7 @@ def graphs_to_pyg(graph_list, y=None, batch_size=32, shuffle=False):
     """Convert a list of graph dicts to a PyTorch Geometric DataLoader.
 
     Args:
-        graph_list: list of graph dicts from mol_to_graph().
+        graph_list: list of graph dicts from mol_graph().
         y: optional list/array of labels (same length as graph_list).
         batch_size: batch size for DataLoader.
         shuffle: whether to shuffle the DataLoader.
@@ -359,7 +359,7 @@ def to_dgl(graph_dict):
     Requires: pip install dgl torch
 
     Args:
-        graph_dict: output of mol_to_graph() for a single molecule.
+        graph_dict: output of mol_graph() for a single molecule.
 
     Returns:
         dgl.DGLGraph with ndata['feat'] and edata['feat']
@@ -541,10 +541,10 @@ def graph_vectors(input_data, *, column=None, enriched=False, type="standard"):
     data, is_batch = _extract_smiles(input_data, column=column)
 
     if not is_batch:
-        g = _mol_to_graph_single(data, enriched=enriched)
+        g = _mol_graph_single(data, enriched=enriched)
         return graph_to_vector(g)
 
-    graphs = [_mol_to_graph_single(s, enriched=enriched) for s in data]
+    graphs = [_mol_graph_single(s, enriched=enriched) for s in data]
     return np.array([graph_to_vector(g) for g in graphs], dtype=np.float32)
 
 

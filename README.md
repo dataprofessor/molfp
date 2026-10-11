@@ -257,13 +257,13 @@ Convert molecules to atom/bond feature matrices for graph neural networks (GCN, 
 
 ```python
 # Convert to graph — returns NumPy arrays (no DL framework needed)
-g = molfp.mol_to_graph("c1ccccc1")
+g = molfp.mol_graph("c1ccccc1")
 # g["atom_features"]  → numpy (6, 20)   atom feature matrix
 # g["edge_index"]     → numpy (2, 12)   adjacency (undirected)
 # g["edge_features"]  → numpy (12, 12)  bond feature matrix
 
 # Batch conversion
-graphs = molfp.mol_to_graph(["CCO", "c1ccccc1", "CC(=O)O"])
+graphs = molfp.mol_graph(["CCO", "c1ccccc1", "CC(=O)O"])
 
 # PyTorch Geometric (requires: pip install torch torch_geometric)
 data = molfp.to_pyg(g, y=1)                          # single graph → Data
@@ -296,7 +296,7 @@ molfp.edge_feature_names()  # ['bond_type_single', ..., 'is_conjugated', 'in_rin
 | Molecule visualization | 2D + 3D interactive | None |
 | Structure standardization | Full pipeline | Basic |
 | Adaptive conformer opt. | MLR-based (FDA drugs) | None |
-| Graph representations | `mol_to_graph()` + PyG/DGL | None |
+| Graph representations | `mol_graph()` + PyG/DGL | None |
 | sklearn compatible | Yes | Yes |
 | Sparse + parallel | Yes | Yes |
 

@@ -4,13 +4,13 @@
 
 ### Additional Molecular Graph Types
 
-`mol_to_graph()` and `graph_vectors()` use a `kind` parameter to select the graph type:
+`mol_graph()` and `graph_vectors()` use a `kind` parameter to select the graph type:
 
 ```python
-molfp.mol_to_graph(smiles, type="standard")    # current — atoms=nodes, bonds=edges
-molfp.mol_to_graph(smiles, type="distance")    # all atom pairs, 3D distance weights
-molfp.mol_to_graph(smiles, type="line")        # bonds=nodes, bond-bond connections
-molfp.mol_to_graph(smiles, type="fragment")    # functional groups=nodes
+molfp.mol_graph(smiles, type="standard")    # current — atoms=nodes, bonds=edges
+molfp.mol_graph(smiles, type="distance")    # all atom pairs, 3D distance weights
+molfp.mol_graph(smiles, type="line")        # bonds=nodes, bond-bond connections
+molfp.mol_graph(smiles, type="fragment")    # functional groups=nodes
 ```
 
 Currently implemented: `type="standard"` (default).

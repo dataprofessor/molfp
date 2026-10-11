@@ -124,7 +124,7 @@ from .distance import (
 )
 from .viz import draw, view3d
 from .graph import (
-    mol_to_graph, to_pyg, to_dgl, graphs_to_pyg,
+    mol_graph, to_pyg, to_dgl, graphs_to_pyg,
     atom_feature_names, edge_feature_names,
     graph_to_vector, graph_vectors, GraphTransformer,
     ATOM_FEATURE_DIM, EDGE_FEATURE_DIM, GRAPH_VECTOR_DIM,
