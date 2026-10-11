@@ -1,3 +1,7 @@
+<p align="center">
+<img src="assets/logo.png" alt="molfp logo" width="300">
+</p>
+
 # molfp
 
 **Interpretable molecular fingerprints with SHAP-driven chemical explanations.**
