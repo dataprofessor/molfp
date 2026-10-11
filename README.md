@@ -251,6 +251,36 @@ Build optimal fusion fingerprints from multiple types using mutual information:
 molfp.fuse(smiles, activities, ["ecfp4", "maccs", "pubchem"])
 ```
 
+### Molecular Graph Representations for Deep Learning
+
+Convert molecules to atom/bond feature matrices for graph neural networks (GCN, GAT, MPNN, etc.). Framework-agnostic core with optional PyTorch Geometric and DGL converters.
+
+```python
+# Convert to graph — returns NumPy arrays (no DL framework needed)
+g = molfp.mol_to_graph("c1ccccc1")
+# g["atom_features"]  → numpy (6, 20)   atom feature matrix
+# g["edge_index"]     → numpy (2, 12)   adjacency (undirected)
+# g["edge_features"]  → numpy (12, 12)  bond feature matrix
+
+# Batch conversion
+graphs = molfp.mol_to_graph(["CCO", "c1ccccc1", "CC(=O)O"])
+
+# PyTorch Geometric (requires: pip install torch torch_geometric)
+data = molfp.to_pyg(g, y=1)                          # single graph → Data
+loader = molfp.graphs_to_pyg(graphs, y=labels, batch_size=32)  # → DataLoader
+
+# DGL (requires: pip install dgl torch)
+dgl_graph = molfp.to_dgl(g)
+
+# Feature inspection
+molfp.atom_feature_names()  # ['atom_type_C', 'atom_type_N', ..., 'is_aromatic', 'in_ring']
+molfp.edge_feature_names()  # ['bond_type_single', ..., 'is_conjugated', 'in_ring', ...]
+```
+
+**Atom features (20 dims):** atom type (one-hot, 10), degree, formal charge, num Hs, hybridization (one-hot, 5), is aromatic, in ring.
+
+**Edge features (12 dims):** bond type (one-hot, 4), is conjugated, in ring, stereo (one-hot, 6).
+
 ## Comparison with scikit-fingerprints (skfp)
 
 | Feature | molfp | skfp |
@@ -266,6 +296,7 @@ molfp.fuse(smiles, activities, ["ecfp4", "maccs", "pubchem"])
 | Molecule visualization | 2D + 3D interactive | None |
 | Structure standardization | Full pipeline | Basic |
 | Adaptive conformer opt. | MLR-based (FDA drugs) | None |
+| Graph representations | `mol_to_graph()` + PyG/DGL | None |
 | sklearn compatible | Yes | Yes |
 | Sparse + parallel | Yes | Yes |
 

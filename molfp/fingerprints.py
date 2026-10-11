@@ -180,12 +180,13 @@ def _atompairs2d_count_single(smiles_or_mol, n_bits=780):
 def _estimate_max_iters(mol):
     """Estimate MMFF iterations needed based on molecular descriptors.
 
-    MLR model trained on 296 FDA-approved drugs (R²=0.793, MAE=41 iters):
-      iters = -25 + 8.7×heavy_atoms + 10.4×rot_bonds − 8.1×rings + 39.5×fsp3
+    MLR model trained on 1,420 FDA-approved drugs (R²=0.785, MAE=43 iters):
+      iters = -10 + 9.9×heavy_atoms + 6.8×rot_bonds − 12.4×rings + 38.3×fsp3
 
-    Validated with uniform step=25 grid on FDA drug benchmark.
-    Kennard-Stone 80/20 split: R² train=0.806, test=0.447 (hard test set).
-    Random split: R² train=0.776, test=0.820.
+    Validated with 80/20 splits on full FDA drug set:
+      Kennard-Stone: R² train=0.782, test=0.757 (hard diverse test set).
+      Random: R² train=0.772, test=0.833.
+      Both: 97.9% first-pass convergence.
 
     Key insights from standardized coefficients:
       - heavy_atoms is the dominant predictor
@@ -193,13 +194,12 @@ def _estimate_max_iters(mol):
       - rot_bonds and fsp3 INCREASE iterations (flexibility)
 
     Applied with 1.5× safety margin, clamped to [200, 2000].
-    97.0% first-pass convergence on FDA drug benchmark.
     """
     n_atoms = mol.GetNumHeavyAtoms()
     n_rot = rdMolDescriptors.CalcNumRotatableBonds(mol)
     n_rings = rdMolDescriptors.CalcNumRings(mol)
     fsp3 = rdMolDescriptors.CalcFractionCSP3(mol)
-    raw = -25 + 8.7 * n_atoms + 10.4 * n_rot - 8.1 * n_rings + 39.5 * fsp3
+    raw = -10 + 9.9 * n_atoms + 6.8 * n_rot - 12.4 * n_rings + 38.3 * fsp3
     return max(200, min(2000, int(1.5 * raw)))
 
 

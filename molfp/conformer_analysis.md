@@ -128,11 +128,11 @@ To confirm on a larger sample, the coarse grid was run on all 1,420 valid FDA dr
 ## Final Formula (Implemented)
 
 ```python
-iters = max(200, min(2000, 1.5 × (-25 + 8.7×atoms + 10.4×rot - 8.1×rings + 39.5×fsp3)))
+iters = max(200, min(2000, 1.5 × (-10 + 9.9×atoms + 6.8×rot - 12.4×rings + 38.3×fsp3)))
 ```
 
-Trained on 296 FDA drugs with uniform step=25 grid. R²=0.793, MAE=41 iters.
-97.0% first-pass convergence with 1.5× safety margin.
+Trained on 1,420 FDA drugs with uniform step=50 grid. R²=0.785, MAE=43 iters.
+97.9% first-pass convergence with 1.5× safety margin.
 
 ### Chemical Interpretation
 - **Rings reduce iterations**: each ring constrains 3 DOF (rigid geometry)

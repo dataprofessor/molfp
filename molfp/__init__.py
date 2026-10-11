@@ -36,7 +36,7 @@ Usage:
     molfp.discriminative_power(smiles)
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 # ── Core fingerprint functions ────────────────────────────────────────────────
 from .fingerprints import (
@@ -123,3 +123,10 @@ from .distance import (
     distance, pairwise, pairwise_distance, available_metrics,
 )
 from .viz import draw, view3d
+from .graph import (
+    mol_to_graph, to_pyg, to_dgl, graphs_to_pyg,
+    atom_feature_names, edge_feature_names,
+    graph_to_vector, graph_vectors, GraphTransformer,
+    ATOM_FEATURE_DIM, EDGE_FEATURE_DIM, GRAPH_VECTOR_DIM,
+    ENRICHED_ATOM_FEATURE_DIM,
+)

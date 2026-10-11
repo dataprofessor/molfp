@@ -1564,6 +1564,193 @@ class TestVisualization:
 
 
 # =============================================================================
+# 20. Graph representations for deep learning
+# =============================================================================
+
+class TestGraph:
+    """Tests for mol_to_graph and related functions."""
+
+    def test_single_molecule_keys(self):
+        g = molfp.mol_to_graph("CCO")
+        assert "atom_features" in g
+        assert "edge_index" in g
+        assert "edge_features" in g
+        assert "num_atoms" in g
+        assert "num_edges" in g
+        assert "smiles" in g
+
+    def test_atom_features_shape(self):
+        g = molfp.mol_to_graph("CCO")  # ethanol: 3 heavy atoms
+        assert g["atom_features"].shape == (3, molfp.ATOM_FEATURE_DIM)
+        assert g["atom_features"].dtype == np.float32
+
+    def test_edge_index_shape(self):
+        g = molfp.mol_to_graph("CCO")  # 2 bonds → 4 edges (undirected)
+        assert g["edge_index"].shape[0] == 2
+        assert g["edge_index"].shape[1] == 4  # 2 bonds * 2 directions
+        assert g["edge_index"].dtype == np.int64
+
+    def test_edge_features_shape(self):
+        g = molfp.mol_to_graph("CCO")
+        n_edges = g["edge_index"].shape[1]
+        assert g["edge_features"].shape == (n_edges, molfp.EDGE_FEATURE_DIM)
+        assert g["edge_features"].dtype == np.float32
+
+    def test_undirected_symmetry(self):
+        """Edge index should be symmetric (each bond in both directions)."""
+        g = molfp.mol_to_graph("c1ccccc1")
+        edge_set = set()
+        for k in range(g["edge_index"].shape[1]):
+            i, j = int(g["edge_index"][0, k]), int(g["edge_index"][1, k])
+            edge_set.add((i, j))
+        # Every (i,j) should have a matching (j,i)
+        for i, j in list(edge_set):
+            assert (j, i) in edge_set
+
+    def test_benzene_atoms_and_edges(self):
+        g = molfp.mol_to_graph("c1ccccc1")
+        assert g["num_atoms"] == 6
+        assert g["num_edges"] == 12  # 6 bonds * 2 directions
+
+    def test_single_atom(self):
+        """Single atom molecule should have no edges."""
+        g = molfp.mol_to_graph("[Na+]")
+        assert g["num_atoms"] == 1
+        assert g["num_edges"] == 0
+        assert g["edge_index"].shape == (2, 0)
+        assert g["edge_features"].shape == (0, molfp.EDGE_FEATURE_DIM)
+
+    def test_aromatic_features(self):
+        """Benzene atoms should be marked aromatic."""
+        g = molfp.mol_to_graph("c1ccccc1")
+        # is_aromatic is the 20th feature (index 19)
+        aromatic_col = 19
+        assert all(g["atom_features"][:, aromatic_col] == 1)
+
+    def test_batch_input(self):
+        graphs = molfp.mol_to_graph(["CCO", "c1ccccc1", "CC(=O)O"])
+        assert isinstance(graphs, list)
+        assert len(graphs) == 3
+        for g in graphs:
+            assert "atom_features" in g
+
+    def test_rdkit_mol_input(self):
+        from rdkit import Chem
+        mol = Chem.MolFromSmiles("CCO")
+        g = molfp.mol_to_graph(mol)
+        assert g["num_atoms"] == 3
+
+    def test_atom_feature_names(self):
+        names = molfp.atom_feature_names()
+        assert len(names) == molfp.ATOM_FEATURE_DIM
+        assert "atom_type_C" in names
+        assert "is_aromatic" in names
+
+    def test_edge_feature_names(self):
+        names = molfp.edge_feature_names()
+        assert len(names) == molfp.EDGE_FEATURE_DIM
+        assert "bond_type_single" in names
+        assert "is_conjugated" in names
+
+    def test_atom_type_one_hot(self):
+        """Carbon atom should have atom_type_C = 1."""
+        g = molfp.mol_to_graph("C")  # methane
+        names = molfp.atom_feature_names()
+        c_idx = names.index("atom_type_C")
+        assert g["atom_features"][0, c_idx] == 1.0
+
+    def test_nitrogen_atom_type(self):
+        g = molfp.mol_to_graph("N")  # ammonia
+        names = molfp.atom_feature_names()
+        n_idx = names.index("atom_type_N")
+        assert g["atom_features"][0, n_idx] == 1.0
+
+    def test_to_pyg_import_error(self):
+        """to_pyg should raise ImportError with install instructions."""
+        try:
+            import torch_geometric
+            g = molfp.mol_to_graph("CCO")
+            data = molfp.to_pyg(g)
+            assert data.x.shape[0] == 3
+        except ModuleNotFoundError:
+            g = molfp.mol_to_graph("CCO")
+            with pytest.raises(ImportError, match="pip install"):
+                molfp.to_pyg(g)
+
+    def test_to_dgl_import_error(self):
+        """to_dgl should raise ImportError with install instructions."""
+        try:
+            import dgl
+            g = molfp.mol_to_graph("CCO")
+            dgl_g = molfp.to_dgl(g)
+            assert dgl_g.num_nodes() == 3
+        except ModuleNotFoundError:
+            g = molfp.mol_to_graph("CCO")
+            with pytest.raises(ImportError, match="pip install"):
+                molfp.to_dgl(g)
+
+    def test_feature_dims_constants(self):
+        assert molfp.ATOM_FEATURE_DIM == 20
+        assert molfp.EDGE_FEATURE_DIM == 12
+
+    # ── Enriched graph features ──────────────────────────────────────────
+
+    def test_enriched_atom_features_shape(self):
+        g = molfp.mol_to_graph("CCO", enriched=True)
+        assert g["atom_features"].shape == (3, molfp.ENRICHED_ATOM_FEATURE_DIM)
+
+    def test_enriched_has_more_features(self):
+        g_base = molfp.mol_to_graph("c1ccccc1")
+        g_enr = molfp.mol_to_graph("c1ccccc1", enriched=True)
+        assert g_enr["atom_features"].shape[1] > g_base["atom_features"].shape[1]
+
+    def test_enriched_base_features_preserved(self):
+        """First 20 columns of enriched should match base features."""
+        g_base = molfp.mol_to_graph("CCO")
+        g_enr = molfp.mol_to_graph("CCO", enriched=True)
+        np.testing.assert_array_equal(
+            g_base["atom_features"],
+            g_enr["atom_features"][:, :molfp.ATOM_FEATURE_DIM]
+        )
+
+    def test_enriched_morgan_bits_set(self):
+        """Enriched features should have some Morgan bits active."""
+        g = molfp.mol_to_graph("c1ccccc1", enriched=True)
+        morgan_start = molfp.ATOM_FEATURE_DIM
+        morgan_end = morgan_start + 3 * 128
+        morgan_feats = g["atom_features"][:, morgan_start:morgan_end]
+        assert morgan_feats.sum() > 0
+
+    def test_graph_vectors_enriched(self):
+        X = molfp.graph_vectors(["CCO", "c1ccccc1"], enriched=True)
+        assert X.shape[0] == 2
+        assert X.shape[1] > 298  # enriched should be much larger
+
+    def test_graph_vectors_base_shape(self):
+        X = molfp.graph_vectors(["CCO", "c1ccccc1"])
+        assert X.shape == (2, 298)
+
+    def test_graph_transformer_enriched(self):
+        t = molfp.GraphTransformer(enriched=True)
+        X = t.fit_transform(["CCO", "c1ccccc1", "CC(=O)O"])
+        assert X.shape[0] == 3
+        assert X.shape[1] > 298
+
+    def test_graph_transformer_select_k(self):
+        t = molfp.GraphTransformer(enriched=True, select_k=50)
+        smiles = ["CCO", "c1ccccc1", "CC(=O)O", "CC(C)CC", "c1ccncc1", "CCN"]
+        y = [0, 1, 0, 0, 1, 1]
+        X = t.fit_transform(smiles, y)
+        assert X.shape == (6, 50)
+
+    def test_graph_transformer_get_params(self):
+        t = molfp.GraphTransformer(enriched=True, select_k=100)
+        params = t.get_params()
+        assert params["enriched"] is True
+        assert params["select_k"] == 100
+
+
+# =============================================================================
 # Run tests
 # =============================================================================
 
