@@ -33,9 +33,9 @@ ACTIVITIES = [4.5, 5.0, 7.2, 6.8, 3.1, 5.5]
 
 class TestCoreFingerprints:
 
-    def test_available_returns_22(self):
+    def test_available_returns_26(self):
         fps = molfp.available()
-        assert len(fps) == 22
+        assert len(fps) == 26
 
     @pytest.mark.parametrize("fp_name,expected_len", [
         ("maccs", 166),
@@ -857,7 +857,7 @@ class TestSklearnTransformers:
         assert t.n_bits == 2048
 
     def test_get_transformer_all_names(self):
-        for name in molfp.available():
+        for name in molfp.TRANSFORMERS:
             t = molfp.get_transformer(name)
             assert t is not None
 
@@ -900,8 +900,11 @@ class TestSklearnTransformers:
     def test_transformers_registry_has_all_22(self):
         assert len(molfp.TRANSFORMERS) == 22
 
-    def test_transformers_registry_matches_fingerprints(self):
-        assert set(molfp.TRANSFORMERS.keys()) == set(molfp.FINGERPRINTS.keys())
+    def test_transformers_registry_matches_base_fingerprints(self):
+        # Transformers cover the 22 non-graph fingerprints
+        graph_fps = {"graph_standard", "graph_distance", "graph_line", "graph_fragment"}
+        fp_names = set(molfp.FINGERPRINTS.keys()) - graph_fps
+        assert set(molfp.TRANSFORMERS.keys()) == fp_names
 
 
 # =============================================================================

@@ -659,6 +659,41 @@ FINGERPRINTS = {
     "getaway": (_getaway_single, 273, "GETAWAY"),
 }
 
+# Graph fingerprints are registered after graph module loads (see __init__.py)
+# to avoid circular imports. They are added via _register_graph_fingerprints().
+
+_GRAPH_FP_REGISTRY = {}
+
+
+def _register_graph_fingerprints():
+    """Register graph vector fingerprints. Called from __init__.py after graph module loads."""
+    from .graph import graph_to_vector, _mol_graph_single, _distance_graph_single, _line_graph_single, _fragment_graph_single
+
+    def _graph_standard_single(smiles_or_mol):
+        g = _mol_graph_single(smiles_or_mol)
+        return graph_to_vector(g).tolist()
+
+    def _graph_distance_single(smiles_or_mol):
+        g = _distance_graph_single(smiles_or_mol)
+        return graph_to_vector(g).tolist()
+
+    def _graph_line_single(smiles_or_mol):
+        g = _line_graph_single(smiles_or_mol)
+        return graph_to_vector(g).tolist()
+
+    def _graph_fragment_single(smiles_or_mol):
+        g = _fragment_graph_single(smiles_or_mol)
+        return graph_to_vector(g).tolist()
+
+    graph_fps = {
+        "graph_standard": (_graph_standard_single, 298, "Graph Standard (atoms=nodes, bonds=edges)"),
+        "graph_distance": (_graph_distance_single, 286, "Graph Distance (complete, 3D)"),
+        "graph_line": (_graph_line_single, 714, "Graph Line (bonds=nodes)"),
+        "graph_fragment": (_graph_fragment_single, 510, "Graph Fragment (functional groups=nodes)"),
+    }
+    FINGERPRINTS.update(graph_fps)
+    _GRAPH_FP_REGISTRY.update(graph_fps)
+
 
 def available() -> list[str]:
     """Return list of available fingerprint names."""
