@@ -1789,6 +1789,91 @@ class TestGraph:
 
 
 # =============================================================================
+# 21. Standalone feature selection
+# =============================================================================
+
+class TestSelection:
+    """Tests for select_features() and remove_low_variance()."""
+
+    def _make_data(self):
+        smiles = SMILES_SET
+        X = np.array([molfp.FINGERPRINTS["klekota_roth"][0](s) for s in smiles], dtype=np.float32)
+        y = np.array([0, 0, 1, 1, 0, 1])
+        return X, y
+
+    def test_remove_low_variance_keys(self):
+        X, _ = self._make_data()
+        result = molfp.remove_low_variance(X, threshold=0.0)
+        assert "X" in result
+        assert "mask" in result
+        assert "n_removed" in result
+        assert "n_remaining" in result
+
+    def test_remove_low_variance_reduces_dims(self):
+        X, _ = self._make_data()
+        result = molfp.remove_low_variance(X, threshold=0.0)
+        assert result["X"].shape[1] < X.shape[1]
+        assert result["n_removed"] + result["n_remaining"] == X.shape[1]
+
+    def test_remove_low_variance_zero_keeps_varying(self):
+        X, _ = self._make_data()
+        result = molfp.remove_low_variance(X, threshold=0.0)
+        variances = np.var(result["X"], axis=0)
+        assert all(v > 0 for v in variances)
+
+    def test_remove_low_variance_higher_threshold_removes_more(self):
+        X, _ = self._make_data()
+        r1 = molfp.remove_low_variance(X, threshold=0.0)
+        r2 = molfp.remove_low_variance(X, threshold=0.1)
+        assert r2["n_remaining"] <= r1["n_remaining"]
+
+    def test_select_features_keys(self):
+        X, y = self._make_data()
+        result = molfp.select_features(X, y, k=20)
+        assert "X" in result
+        assert "indices" in result
+        assert "scores" in result
+        assert "n_input" in result
+        assert "n_selected" in result
+
+    def test_select_features_shape(self):
+        X, y = self._make_data()
+        result = molfp.select_features(X, y, k=20)
+        assert result["X"].shape == (len(y), 20)
+        assert len(result["indices"]) == 20
+        assert len(result["scores"]) == 20
+
+    def test_select_features_indices_valid(self):
+        X, y = self._make_data()
+        result = molfp.select_features(X, y, k=10)
+        assert all(0 <= idx < X.shape[1] for idx in result["indices"])
+
+    def test_select_features_with_threshold(self):
+        X, y = self._make_data()
+        result = molfp.select_features(X, y, k=15, threshold=0.01)
+        assert result["X"].shape == (len(y), 15)
+        assert result["n_after_variance"] < result["n_input"]
+
+    def test_select_features_k_larger_than_available(self):
+        X, y = self._make_data()
+        result = molfp.select_features(X, y, k=99999)
+        assert result["X"].shape[1] <= X.shape[1]
+
+    def test_select_features_on_ecfp4(self):
+        smiles = SMILES_SET
+        X = np.array([molfp.FINGERPRINTS["ecfp4"][0](s) for s in smiles], dtype=np.float32)
+        y = np.array([0, 0, 1, 1, 0, 1])
+        result = molfp.select_features(X, y, k=50)
+        assert result["X"].shape == (6, 50)
+
+    def test_select_features_on_graph_vectors(self):
+        X = molfp.graph_vectors(SMILES_SET, enriched=True)
+        y = np.array([0, 0, 1, 1, 0, 1])
+        result = molfp.select_features(X, y, k=100, threshold=0.01)
+        assert result["X"].shape == (6, 100)
+
+
+# =============================================================================
 # Run tests
 # =============================================================================
 

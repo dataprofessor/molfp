@@ -130,3 +130,4 @@ from .graph import (
     ATOM_FEATURE_DIM, EDGE_FEATURE_DIM, GRAPH_VECTOR_DIM,
     ENRICHED_ATOM_FEATURE_DIM,
 )
+from .selection import select_features, remove_low_variance
