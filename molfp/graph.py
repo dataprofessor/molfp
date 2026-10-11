@@ -256,7 +256,7 @@ def _mol_to_graph_single(smiles_or_mol, enriched=False):
     }
 
 
-def mol_to_graph(input_data, *, column=None, enriched=False, kind="standard"):
+def mol_to_graph(input_data, *, column=None, enriched=False, type="standard"):
     """Convert molecule(s) to graph representation(s) for deep learning.
 
     Args:
@@ -264,18 +264,18 @@ def mol_to_graph(input_data, *, column=None, enriched=False, kind="standard"):
         column: column name for DataFrame input.
         enriched: if True, add Morgan hashes, functional group membership,
             and neighbor counts per atom (432 dims vs 20 base dims).
-        kind: graph type — "standard" (atoms=nodes, bonds=edges).
+        type: graph type — "standard" (atoms=nodes, bonds=edges).
             Future: "distance", "line", "fragment".
 
     Returns:
         Single molecule: dict with atom_features, edge_index, edge_features.
         Multiple molecules: list of dicts.
     """
-    _VALID_KINDS = ("standard", "distance", "line", "fragment")
-    if kind not in _VALID_KINDS:
-        raise ValueError(f"Unknown kind={kind!r}. Available: {_VALID_KINDS}")
-    if kind != "standard":
-        raise NotImplementedError(f"kind={kind!r} is planned but not yet implemented. Use kind='standard'.")
+    _VALID_TYPES = ("standard", "distance", "line", "fragment")
+    if type not in _VALID_TYPES:
+        raise ValueError(f"Unknown type={type!r}. Available: {_VALID_TYPES}")
+    if type != "standard":
+        raise NotImplementedError(f"type={type!r} is planned but not yet implemented. Use type='standard'.")
 
     data, is_batch = _extract_smiles(input_data, column=column)
 
@@ -517,7 +517,7 @@ def graph_to_vector(graph_dict):
 GRAPH_VECTOR_DIM = 4 * ATOM_FEATURE_DIM + 4 * ATOM_FEATURE_DIM + 2 * ATOM_FEATURE_DIM + 2 * ATOM_FEATURE_DIM + 2 * EDGE_FEATURE_DIM + 2 * EDGE_FEATURE_DIM + 10  # 298
 
 
-def graph_vectors(input_data, *, column=None, enriched=False, kind="standard"):
+def graph_vectors(input_data, *, column=None, enriched=False, type="standard"):
     """Convert molecule(s) to fixed-length graph feature vectors for sklearn.
 
     Args:
@@ -525,18 +525,18 @@ def graph_vectors(input_data, *, column=None, enriched=False, kind="standard"):
         column: column name for DataFrame input.
         enriched: if True, use enriched atom features (Morgan hashes +
             functional groups + neighbor counts) for richer aggregation.
-        kind: graph type — "standard" (atoms=nodes, bonds=edges).
+        type: graph type — "standard" (atoms=nodes, bonds=edges).
             Future: "distance", "line", "fragment".
 
     Returns:
         Single molecule: numpy array
         Multiple molecules: numpy array (n_samples, n_features)
     """
-    _VALID_KINDS = ("standard", "distance", "line", "fragment")
-    if kind not in _VALID_KINDS:
-        raise ValueError(f"Unknown kind={kind!r}. Available: {_VALID_KINDS}")
-    if kind != "standard":
-        raise NotImplementedError(f"kind={kind!r} is planned but not yet implemented. Use kind='standard'.")
+    _VALID_TYPES = ("standard", "distance", "line", "fragment")
+    if type not in _VALID_TYPES:
+        raise ValueError(f"Unknown type={type!r}. Available: {_VALID_TYPES}")
+    if type != "standard":
+        raise NotImplementedError(f"type={type!r} is planned but not yet implemented. Use type='standard'.")
 
     data, is_batch = _extract_smiles(input_data, column=column)
 
