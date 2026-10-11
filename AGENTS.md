@@ -1,5 +1,12 @@
 # molfp — Development Notes
 
+## Git & Repository
+
+- **Git identity**: `Chanin Nantasenamat <dataprofessorofficial@gmail.com>` — always use this for commits. Set via `git config` in this repo.
+- **Do NOT** add `Co-authored-by: Snowflake CoCo` to commit messages.
+- **GitHub repo**: `dataprofessor/molfp` (fresh repo, clean contributor list).
+- **PyPI publishing**: GitHub Actions trusted publisher via `pypi` environment. Triggered on release.
+
 ## Future Work
 
 ### Additional Molecular Graph Types
