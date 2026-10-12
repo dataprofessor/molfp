@@ -2062,15 +2062,18 @@ class TestScaffold:
         assert "murcko" in result
         assert "generic" in result
         assert "smiles" in result
+        assert "name" in result
 
     def test_scaffold_aspirin_has_ring(self):
         result = molfp.scaffold(ASPIRIN)
         assert result["murcko"] != ""
         assert result["generic"] != ""
+        assert result["name"] == "Benzene"
 
     def test_scaffold_ethanol_empty(self):
         result = molfp.scaffold(ETHANOL)
-        assert result["murcko"] == ""  # no rings
+        assert result["murcko"] == ""
+        assert result["name"] == "No ring system"
 
     def test_scaffold_batch(self):
         results = molfp.scaffold(SMILES_SET)
@@ -2080,6 +2083,12 @@ class TestScaffold:
     def test_scaffold_generic_is_simplified(self):
         result = molfp.scaffold("c1ccc(-c2ccccc2)cc1")  # biphenyl
         assert "c" not in result["generic"]  # no aromatic atoms in generic
+
+    def test_scaffold_named_common_rings(self):
+        assert molfp.scaffold("c1ccncc1")["name"] == "Pyridine"
+        assert molfp.scaffold("C1CCNCC1")["name"] == "Piperidine"
+        assert molfp.scaffold("c1ccc2[nH]ccc2c1")["name"] == "Indole"
+        assert molfp.scaffold("CN1C=NC2=C1C(=O)N(C(=O)N2C)C")["name"] == "Xanthine"
 
     # ── scaffold_fingerprint() ───────────────────────────────────────
 
