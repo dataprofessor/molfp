@@ -132,6 +132,7 @@ from .graph import (
     ENRICHED_ATOM_FEATURE_DIM,
 )
 from .selection import select_features, remove_low_variance
+from .scaffold import scaffold, scaffold_fingerprint, scaffold_split
 
 # Register graph fingerprints after both modules are loaded
 from .fingerprints import _register_graph_fingerprints

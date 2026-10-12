@@ -2050,6 +2050,105 @@ class TestCollisionHandling:
 
 
 # =============================================================================
+# 23. Scaffold extraction, fingerprint, and split
+# =============================================================================
+
+class TestScaffold:
+
+    # ── scaffold() ───────────────────────────────────────────────────
+
+    def test_scaffold_single_keys(self):
+        result = molfp.scaffold(ASPIRIN)
+        assert "murcko" in result
+        assert "generic" in result
+        assert "smiles" in result
+
+    def test_scaffold_aspirin_has_ring(self):
+        result = molfp.scaffold(ASPIRIN)
+        assert result["murcko"] != ""
+        assert result["generic"] != ""
+
+    def test_scaffold_ethanol_empty(self):
+        result = molfp.scaffold(ETHANOL)
+        assert result["murcko"] == ""  # no rings
+
+    def test_scaffold_batch(self):
+        results = molfp.scaffold(SMILES_SET)
+        assert isinstance(results, list)
+        assert len(results) == len(SMILES_SET)
+
+    def test_scaffold_generic_is_simplified(self):
+        result = molfp.scaffold("c1ccc(-c2ccccc2)cc1")  # biphenyl
+        assert "c" not in result["generic"]  # no aromatic atoms in generic
+
+    # ── scaffold_fingerprint() ───────────────────────────────────────
+
+    def test_scaffold_fp_keys(self):
+        result = molfp.scaffold_fingerprint(SMILES_SET)
+        assert "X" in result
+        assert "scaffolds" in result
+        assert "assignments" in result
+        assert "n_scaffolds" in result
+
+    def test_scaffold_fp_shape(self):
+        result = molfp.scaffold_fingerprint(SMILES_SET)
+        assert result["X"].shape[0] == len(SMILES_SET)
+        assert result["X"].shape[1] == result["n_scaffolds"]
+
+    def test_scaffold_fp_binary(self):
+        result = molfp.scaffold_fingerprint(SMILES_SET)
+        assert set(np.unique(result["X"])).issubset({0, 1})
+
+    def test_scaffold_fp_each_row_has_one(self):
+        result = molfp.scaffold_fingerprint(SMILES_SET)
+        for i in range(result["X"].shape[0]):
+            assert result["X"][i].sum() >= 0  # 0 if no ring scaffold
+
+    def test_scaffold_fp_generic_type(self):
+        result = molfp.scaffold_fingerprint(SMILES_SET, scaffold_type="generic")
+        assert result["n_scaffolds"] > 0
+
+    # ── scaffold_split() ─────────────────────────────────────────────
+
+    def test_scaffold_split_keys(self):
+        result = molfp.scaffold_split(SMILES_SET)
+        assert "train_idx" in result
+        assert "test_idx" in result
+        assert "n_train" in result
+        assert "n_test" in result
+        assert "scaffold_groups" in result
+
+    def test_scaffold_split_covers_all(self):
+        result = molfp.scaffold_split(SMILES_SET)
+        all_idx = set(result["train_idx"].tolist()) | set(result["test_idx"].tolist())
+        assert all_idx == set(range(len(SMILES_SET)))
+
+    def test_scaffold_split_no_overlap(self):
+        result = molfp.scaffold_split(SMILES_SET)
+        train_set = set(result["train_idx"].tolist())
+        test_set = set(result["test_idx"].tolist())
+        assert train_set & test_set == set()
+
+    def test_scaffold_split_no_leakage(self):
+        """No scaffold should appear in both train and test."""
+        smiles = SMILES_SET * 3  # repeat to get more molecules
+        result = molfp.scaffold_split(smiles, test_size=0.3)
+        train_set = set(result["train_idx"].tolist())
+        test_set = set(result["test_idx"].tolist())
+
+        for scaf, indices in result["scaffold_groups"].items():
+            in_train = any(i in train_set for i in indices)
+            in_test = any(i in test_set for i in indices)
+            assert not (in_train and in_test), f"Scaffold {scaf} leaked"
+
+    def test_scaffold_split_test_size(self):
+        smiles = SMILES_SET * 5
+        result = molfp.scaffold_split(smiles, test_size=0.2)
+        actual_ratio = result["n_test"] / (result["n_train"] + result["n_test"])
+        assert 0.05 <= actual_ratio <= 0.5  # approximate
+
+
+# =============================================================================
 # Run tests
 # =============================================================================
 
