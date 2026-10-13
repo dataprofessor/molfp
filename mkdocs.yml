@@ -1,0 +1,73 @@
+site_name: molfp
+site_url: https://dataprofessor.github.io/molfp/
+site_description: Interpretable molecular fingerprints with SHAP-driven chemical explanations
+repo_url: https://github.com/dataprofessor/molfp
+repo_name: dataprofessor/molfp
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+    - search.suggest
+  icon:
+    repo: fontawesome/brands/github
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - API Reference:
+    - Fingerprints: api/fingerprints.md
+    - Explain & Annotate: api/explain.md
+    - Interpret: api/interpret.md
+    - Collisions: api/collisions.md
+    - Similarity & Distance: api/similarity.md
+    - Bioactivity: api/bioactivity.md
+    - Activity Cliffs: api/cliffs.md
+    - Fusion: api/fusion.md
+    - Scaffold: api/scaffold.md
+    - Graph: api/graph.md
+    - Feature Selection: api/selection.md
+    - Visualization: api/viz.md
+    - Standardize: api/standardize.md
+    - sklearn: api/sklearn.md
+  - Changelog: changelog.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: false
+            show_root_heading: true
+            heading_level: 3
+            members_order: source
+            docstring_style: google
+            show_signature_annotations: false
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true

@@ -26,14 +26,14 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -e .
-          pip install pdoc
+          pip install mkdocs-material mkdocstrings[python]
 
       - name: Build docs
-        run: pdoc molfp -o docs/
+        run: mkdocs build
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/
+          path: site/
 
   deploy:
     needs: build

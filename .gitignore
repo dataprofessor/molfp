@@ -6,3 +6,4 @@ build/
 .pytest_cache/
 .DS_Store
 assets/logo-drafts/
+site/
