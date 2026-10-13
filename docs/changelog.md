@@ -31,6 +31,7 @@
 ## v0.2.0 (2026-04-19)
 
 Initial release:
+
 - 13 2D fingerprint types (MACCS, ECFP4, PubChem, Substructure, KlekotaRoth, etc.)
 - `explain()` — bit-level atom attribution
 - `annotate()` — chemical names for fingerprint bits
