@@ -24,6 +24,7 @@ theme:
   features:
     - navigation.sections
     - navigation.expand
+    - navigation.indexes
     - content.code.copy
     - search.suggest
   icon:
@@ -33,6 +34,7 @@ nav:
   - Home: index.md
   - Getting Started: getting-started.md
   - API Reference:
+    - api/index.md
     - Fingerprints: api/fingerprints.md
     - Explain & Annotate: api/explain.md
     - Interpret: api/interpret.md
