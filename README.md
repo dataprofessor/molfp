@@ -1,5 +1,5 @@
 <p align="center">
-<img src="assets/logo.png" alt="molfp logo" width="300">
+<img src="https://raw.githubusercontent.com/dataprofessor/molfp/main/assets/logo.png" alt="molfp logo" width="300">
 </p>
 
 # molfp
@@ -55,8 +55,8 @@ molfp.draw("CC(=O)Oc1ccccc1C(=O)O", highlight_bits=[88, 143, 162], fp_type="macc
 
 <table>
 <tr>
-<td align="center"><img src="assets/draw_2d_grid.png" alt="2D molecule grid" width="500"></td>
-<td align="center"><img src="assets/draw_2d_highlight.png" alt="2D with fingerprint bit highlighting" width="220"></td>
+<td align="center"><img src="https://raw.githubusercontent.com/dataprofessor/molfp/main/assets/draw_2d_grid.png" alt="2D molecule grid" width="500"></td>
+<td align="center"><img src="https://raw.githubusercontent.com/dataprofessor/molfp/main/assets/draw_2d_highlight.png" alt="2D with fingerprint bit highlighting" width="220"></td>
 </tr>
 <tr>
 <td align="center"><em>Molecule grid with labels</em></td>
@@ -79,7 +79,7 @@ molfp.view3d("CC(=O)Oc1ccccc1C(=O)O", style="ball_and_stick", spin=True)
 Uses adaptive conformer optimization (MMFF94) to generate optimized 3D structures automatically.
 
 <p align="center">
-<img src="assets/view3d_notebook.png" alt="3D interactive viewer in Jupyter notebook" width="600">
+<img src="https://raw.githubusercontent.com/dataprofessor/molfp/main/assets/view3d_notebook.png" alt="3D interactive viewer in Jupyter notebook" width="600">
 </p>
 
 ## Features
@@ -370,26 +370,6 @@ result = molfp.scaffold_fingerprint(smiles)
 result = molfp.scaffold_split(smiles, test_size=0.2)
 train_idx, test_idx = result["train_idx"], result["test_idx"]
 ```
-
-## Comparison with scikit-fingerprints (skfp)
-
-| Feature | molfp | skfp |
-|---------|-------|------|
-| Fingerprint types | 30 (13 2D + 9 3D + 8 graph) | 35 |
-| Bit-level explainability | 13 2D FPs | None |
-| Chemical annotation | Built-in | Feature names only |
-| SHAP + chemical meaning | `interpret()` | None |
-| Hash collision handling | detect, remove, collision-free mode | None |
-| Scaffold analysis | `scaffold()`, `scaffold_split()` | None |
-| Activity cliff detection | `activity_cliffs()` | None |
-| Bioactivity profiling | `classify()`, `enriched_bits()` | None |
-| Consensus fingerprints | `fuse()` | None |
-| Molecule visualization | 2D + 3D interactive | None |
-| Structure standardization | Full pipeline | Basic |
-| Adaptive conformer opt. | MLR-based (FDA drugs) | None |
-| Graph representations | `mol_graph()` + PyG/DGL | None |
-| sklearn compatible | Yes | Yes |
-| Sparse + parallel | Yes | Yes |
 
 ## License
 

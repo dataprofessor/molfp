@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "molfp"
-version = "0.3.0"
+version = "0.3.1"
 description = "Interpretable molecular fingerprints with SHAP-driven chemical explanations"
 readme = "README.md"
 license = {text = "MIT"}
