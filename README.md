@@ -324,6 +324,53 @@ molfp.edge_feature_names()  # ['bond_type_single', ..., 'is_conjugated', 'in_rin
 
 **Edge features (12 dims):** bond type (one-hot, 4), is conjugated, in ring, stereo (one-hot, 6).
 
+### Graph Vectors for scikit-learn
+
+```python
+# Fixed-length vectors from any graph type
+X = molfp.graph_vectors(smiles, type="standard", enriched=True)
+
+# sklearn pipeline
+from sklearn.pipeline import make_pipeline
+from sklearn.ensemble import RandomForestClassifier
+pipe = make_pipeline(molfp.GraphTransformer(enriched=True, type="standard"), RandomForestClassifier())
+pipe.fit(smiles_train, y_train)
+```
+
+### Collision Handling
+
+Hashed fingerprints (ECFP4, RDK, AtomPairs) fold substructures into fixed-length vectors via modulo, causing hash collisions that corrupt SHAP attributions.
+
+```python
+# Detect collisions
+molfp.detect_collisions("c1ccccc1", "ecfp4", n_bits=1024)
+
+# Remove colliding bits from feature matrix
+result = molfp.remove_collisions(X, smiles, "ecfp4", 1024)
+
+# Collision-free mode (multi-hash Bloom filter approach)
+fps = molfp.ecfp4(smiles, collision_free=True)  # works on all 8 hashed FPs
+
+# Collision-aware SHAP interpretation
+result = molfp.interpret(smiles, activities, fp_type="ecfp4", collision_aware=True)
+```
+
+### Scaffold Analysis
+
+Extract Murcko/generic scaffolds with chemical names from ~130 common ring systems. Scaffold-aware train/test splitting prevents data leakage in QSAR.
+
+```python
+molfp.scaffold("CC(=O)Oc1ccccc1C(=O)O")
+# {"murcko": "c1ccccc1", "generic": "C1CCCCC1", "name": "Benzene"}
+
+# Scaffold fingerprint — binary membership matrix
+result = molfp.scaffold_fingerprint(smiles)
+
+# Scaffold-aware split (no scaffold leakage)
+result = molfp.scaffold_split(smiles, test_size=0.2)
+train_idx, test_idx = result["train_idx"], result["test_idx"]
+```
+
 ## Comparison with scikit-fingerprints (skfp)
 
 | Feature | molfp | skfp |
@@ -332,7 +379,8 @@ molfp.edge_feature_names()  # ['bond_type_single', ..., 'is_conjugated', 'in_rin
 | Bit-level explainability | 13 2D FPs | None |
 | Chemical annotation | Built-in | Feature names only |
 | SHAP + chemical meaning | `interpret()` | None |
-| Hash collision detection | `detect_collisions()` | None |
+| Hash collision handling | detect, remove, collision-free mode | None |
+| Scaffold analysis | `scaffold()`, `scaffold_split()` | None |
 | Activity cliff detection | `activity_cliffs()` | None |
 | Bioactivity profiling | `classify()`, `enriched_bits()` | None |
 | Consensus fingerprints | `fuse()` | None |

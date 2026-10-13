@@ -1,39 +1,39 @@
 """
-molfp — Native Python/RDKit molecular fingerprint library.
+molfp — Interpretable molecular fingerprints with SHAP-driven chemical explanations.
 
-13 fingerprint types + 7 novel analysis modules:
-  - explain: bit-level explainability (which atoms set which bits)
-  - annotate: chemical names/descriptions for every bit
-  - collisions: hash collision detection for hashed FPs
-  - similarity: similarity distribution diagnostics
+30 fingerprint types (13 2D + 9 3D + 8 graph) plus analysis modules:
+  - explain/annotate: bit-level explainability and chemical annotation
+  - interpret: SHAP interpretation with chemical meaning
+  - collisions: hash collision detection, removal, and collision-free mode
+  - similarity: pairwise metrics and similarity profiling
   - cliffs: activity cliff detection
+  - bioactivity: activity classification, enriched/depleted bits
   - fusion: consensus fingerprint construction
-  - isomers: structural isomer awareness
+  - isomers: structural isomer discrimination
+  - graph: molecular graph representations for GNNs (4 types x 2 variants)
+  - selection: feature selection (variance filter, mutual information)
+  - scaffold: scaffold extraction, fingerprinting, and scaffold-aware splitting
+  - viz: 2D drawing and 3D interactive viewer
+  - standardize: desalt, neutralize, canonicalize, deduplicate
+  - sklearn: 22 transformers + GraphTransformer for pipelines
 
 Usage:
     import molfp
 
-    # Compute fingerprints
+    # Compute fingerprints — versatile input (str, list, Series, DataFrame)
     fp = molfp.maccs("CCO")
-    fps = molfp.maccs_batch(["CCO", "c1ccccc1"])
+    fps = molfp.ecfp4(["CCO", "c1ccccc1"], collision_free=True)
 
-    # Explain which atoms set which bits
-    molfp.explain("CCO", "ecfp4")
+    # Molecular graphs for GNNs or sklearn
+    g = molfp.mol_graph("c1ccccc1", type="standard", enriched=True)
+    X = molfp.graph_vectors(smiles, type="standard", enriched=True)
 
-    # Get chemical annotation for a bit
-    molfp.annotate("substructure", 1)
+    # Scaffold analysis
+    molfp.scaffold("CC(=O)Oc1ccccc1C(=O)O")  # {"murcko": ..., "name": "Benzene"}
+    train_idx, test_idx = molfp.scaffold_split(smiles, test_size=0.2)
 
-    # Detect hash collisions
-    molfp.detect_collisions("c1ccccc1", "ecfp4")
-
-    # Find activity cliffs
-    molfp.activity_cliffs(smiles, activities, "ecfp4")
-
-    # Build optimal fusion fingerprint
-    molfp.fuse(smiles, activities, ["ecfp4", "maccs", "pubchem"])
-
-    # Check discriminative power
-    molfp.discriminative_power(smiles)
+    # Interpret with collision awareness
+    result = molfp.interpret(smiles, activities, fp_type="ecfp4", collision_aware=True)
 """
 
 __version__ = "0.3.0"
