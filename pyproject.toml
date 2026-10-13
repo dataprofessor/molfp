@@ -52,6 +52,7 @@ dev = [
 
 [project.urls]
 Homepage = "https://github.com/dataprofessor/molfp"
+Documentation = "https://dataprofessor.github.io/molfp/"
 Repository = "https://github.com/dataprofessor/molfp"
 
 [tool.setuptools.packages.find]

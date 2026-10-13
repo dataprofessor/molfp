@@ -2,6 +2,15 @@
 <img src="https://raw.githubusercontent.com/dataprofessor/molfp/main/assets/logo.png" alt="molfp logo" width="300">
 </p>
 
+<p align="center">
+<a href="https://pypi.org/project/molfp/"><img src="https://img.shields.io/pypi/v/molfp" alt="PyPI"></a>
+<a href="https://pypi.org/project/molfp/"><img src="https://img.shields.io/pypi/pyversions/molfp" alt="Python"></a>
+<a href="https://github.com/dataprofessor/molfp/actions/workflows/tests.yml"><img src="https://github.com/dataprofessor/molfp/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
+<a href="https://github.com/dataprofessor/molfp/blob/main/LICENSE"><img src="https://img.shields.io/pypi/l/molfp" alt="License"></a>
+<a href="https://dataprofessor.github.io/molfp/"><img src="https://img.shields.io/badge/docs-pdoc-blue" alt="Docs"></a>
+<a href="https://colab.research.google.com/github/dataprofessor/molfp/blob/main/examples/getting_started_colab.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a>
+</p>
+
 # molfp
 
 **Interpretable molecular fingerprints with SHAP-driven chemical explanations.**

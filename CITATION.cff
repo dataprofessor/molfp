@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "molfp"
+version: "0.3.1"
+date-released: "2026-10-13"
+license: MIT
+url: "https://github.com/dataprofessor/molfp"
+repository-code: "https://github.com/dataprofessor/molfp"
+abstract: >-
+  Interpretable molecular fingerprints with SHAP-driven chemical explanations.
+  A native Python/RDKit library that computes 30 molecular fingerprint types
+  and provides built-in tools for interpretation, visualization, collision
+  detection, activity cliff analysis, bioactivity profiling, and SHAP-based
+  feature explanation.
+authors:
+  - family-names: "Nantasenamat"
+    given-names: "Chanin"
+    orcid: "https://orcid.org/0000-0003-1040-663X"
+keywords:
+  - cheminformatics
+  - molecular fingerprints
+  - drug discovery
+  - QSAR
+  - SHAP
+  - interpretability
+  - scikit-learn
