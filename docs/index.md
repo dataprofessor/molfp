@@ -1,8 +1,3 @@
----
-hide:
-  - navigation
----
-
 <p align="center">
 <img src="https://raw.githubusercontent.com/dataprofessor/molfp/main/assets/logo.png" alt="molfp logo" width="300">
 </p>
