@@ -6,6 +6,43 @@ molfp is organized by activity type in a typical cheminformatics workflow. Each 
 import molfp
 ```
 
+```mermaid
+graph TD
+    FP["<b>Fingerprints</b>"]
+    EA["<b>Explain & Annotate</b>"]
+    CO["<b>Collisions</b>"]
+    SC["<b>Scaffold</b>"]
+    IN["<b>Interpret</b>"]
+    SD["<b>Similarity & Distance</b>"]
+    BA["<b>Bioactivity</b>"]
+    AC["<b>Activity Cliffs</b>"]
+    FU["<b>Fusion</b>"]
+    GR["<b>Graph</b>"]
+    FS["<b>Feature Selection</b>"]
+    SK["<b>sklearn</b>"]
+
+    FP --> EA & CO & SC
+    EA --> IN
+    CO --> SD
+    IN --> BA
+    SD --> AC
+    BA & AC --> FU
+    FU & SC --> GR & FS & SK
+
+    style FP fill:#2563eb,color:#fff,stroke:#1d4ed8
+    style EA fill:#3b82f6,color:#fff,stroke:#2563eb
+    style CO fill:#3b82f6,color:#fff,stroke:#2563eb
+    style SC fill:#3b82f6,color:#fff,stroke:#2563eb
+    style IN fill:#3b82f6,color:#fff,stroke:#2563eb
+    style SD fill:#3b82f6,color:#fff,stroke:#2563eb
+    style BA fill:#0d9488,color:#fff,stroke:#0f766e
+    style AC fill:#0d9488,color:#fff,stroke:#0f766e
+    style FU fill:#0d9488,color:#fff,stroke:#0f766e
+    style GR fill:#0d9488,color:#fff,stroke:#0f766e
+    style FS fill:#0d9488,color:#fff,stroke:#0f766e
+    style SK fill:#0d9488,color:#fff,stroke:#0f766e
+```
+
 ---
 
 ## Compute
@@ -160,45 +197,4 @@ SMILES cleaning pipeline — desalt, neutralize, canonicalize tautomers, dedupli
 ```python
 clean = molfp.preprocess(smiles)  # full pipeline
 molfp.standardize_smiles("CC(=O)Oc1ccccc1C(=O)[O-].[Na+]")
-```
-
----
-
-## Workflow
-
-```mermaid
-graph TD
-    FP["<b>Fingerprints</b>"]
-    EA["<b>Explain & Annotate</b>"]
-    CO["<b>Collisions</b>"]
-    SC["<b>Scaffold</b>"]
-    IN["<b>Interpret</b>"]
-    SD["<b>Similarity & Distance</b>"]
-    BA["<b>Bioactivity</b>"]
-    AC["<b>Activity Cliffs</b>"]
-    FU["<b>Fusion</b>"]
-    GR["<b>Graph</b>"]
-    FS["<b>Feature Selection</b>"]
-    SK["<b>sklearn</b>"]
-
-    FP --> EA & CO & SC
-    EA --> IN
-    CO --> SD
-    IN --> BA
-    SD --> AC
-    BA & AC --> FU
-    FU & SC --> GR & FS & SK
-
-    style FP fill:#2563eb,color:#fff,stroke:#1d4ed8
-    style EA fill:#3b82f6,color:#fff,stroke:#2563eb
-    style CO fill:#3b82f6,color:#fff,stroke:#2563eb
-    style SC fill:#3b82f6,color:#fff,stroke:#2563eb
-    style IN fill:#3b82f6,color:#fff,stroke:#2563eb
-    style SD fill:#3b82f6,color:#fff,stroke:#2563eb
-    style BA fill:#0d9488,color:#fff,stroke:#0f766e
-    style AC fill:#0d9488,color:#fff,stroke:#0f766e
-    style FU fill:#0d9488,color:#fff,stroke:#0f766e
-    style GR fill:#0d9488,color:#fff,stroke:#0f766e
-    style FS fill:#0d9488,color:#fff,stroke:#0f766e
-    style SK fill:#0d9488,color:#fff,stroke:#0f766e
 ```
