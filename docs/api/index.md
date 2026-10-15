@@ -1,10 +1,12 @@
 # API Reference
 
-molfp is organized by activity type in a typical cheminformatics workflow. Each module handles one step — from computing fingerprints to preparing features for machine learning. All functions are importable directly from `molfp`. Browse the modules below and click to see full signatures and documentation.
+molfp is organized by activity type in a typical cheminformatics workflow. Each module handles one step — from computing fingerprints to preparing features for machine learning. All functions are importable directly from `molfp`.
 
 ```python
 import molfp
 ```
+
+Browse the modules below for function details and examples.
 
 ```mermaid
 graph TD
