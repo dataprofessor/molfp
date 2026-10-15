@@ -1,12 +1,16 @@
 # API Reference
 
-molfp is organized by activity type in a typical cheminformatics workflow. Each module handles one step — from computing fingerprints to preparing features for machine learning. All functions are importable directly from `molfp`.
+molfp is organized by activity type in a typical cheminformatics workflow. All functions are importable directly from `molfp`.
 
 ```python
 import molfp
 ```
 
-Browse the modules below for function details and examples.
+## Workflow
+
+A cheminformatics project typically starts with computing molecular fingerprints, then moves through understanding what the bits mean, validating data quality, analyzing structure-activity relationships, and finally preparing features for machine learning. The diagram below shows how molfp's modules connect across these stages.
+
+Each module handles one step — from [Fingerprints](#compute) through [Explain & Annotate](#understand), [Collisions](#validate), [Bioactivity](#analyze), [Fusion](#combine), and [Graph](#represent) representations, all the way to [sklearn](#model) transformers ready for pipelines. [Visualization and Standardize](#utilities) support the workflow at any stage.
 
 ```mermaid
 graph TD
@@ -44,6 +48,8 @@ graph TD
     style FS fill:#0d9488,color:#fff,stroke:#0f766e
     style SK fill:#0d9488,color:#fff,stroke:#0f766e
 ```
+
+Browse the modules below for function details and examples.
 
 ---
 
