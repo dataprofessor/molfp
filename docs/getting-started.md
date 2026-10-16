@@ -6,6 +6,67 @@
 pip install molfp
 ```
 
+molfp requires **Python 3.9+** and **RDKit**. RDKit is installed automatically via the `rdkit` PyPI package. If you're using conda, you may already have it:
+
+```bash
+# Check if RDKit is available
+python -c "from rdkit import Chem; print(Chem.MolFromSmiles('CCO'))"
+```
+
+**Optional dependencies** for graph neural networks:
+
+```bash
+# PyTorch Geometric
+pip install torch torch_geometric
+
+# DGL
+pip install dgl torch
+```
+
+## Quick Start: End-to-End QSAR Workflow
+
+Here's a complete workflow — from SMILES to a trained classifier with interpretable results:
+
+```python
+import molfp
+import numpy as np
+
+# 1. Define molecules and activities
+smiles = [
+    "CC(=O)Oc1ccccc1C(=O)O",  # Aspirin
+    "CC(C)Cc1ccc(cc1)C(C)C(=O)O",  # Ibuprofen
+    "OC(=O)c1ccccc1O",  # Salicylic acid
+    "c1ccccc1",  # Benzene
+    "CCO",  # Ethanol
+    "CCCCCC",  # Hexane
+]
+activities = [7.2, 6.8, 6.5, 4.0, 3.5, 3.0]  # pIC50 values
+
+# 2. Standardize SMILES
+clean = molfp.preprocess(smiles)
+
+# 3. Compute fingerprints (collision-free for clean SHAP)
+fps = molfp.ecfp4(clean["smiles"], collision_free=True)
+
+# 4. Interpret with SHAP — get chemical meaning for top features
+result = molfp.interpret(
+    clean["smiles"], activities,
+    fp_type="ecfp4", metric="pchembl", collision_aware=True
+)
+print(f"Top driving bits: {result['top_bits'][:5]}")
+
+# 5. Scaffold-aware split (no data leakage)
+split = molfp.scaffold_split(clean["smiles"], test_size=0.3)
+print(f"Train: {len(split['train_idx'])}, Test: {len(split['test_idx'])}")
+
+# 6. Build sklearn pipeline
+from sklearn.pipeline import make_pipeline
+from sklearn.ensemble import RandomForestClassifier
+
+pipe = make_pipeline(molfp.ECFPTransformer(), RandomForestClassifier())
+# pipe.fit(smiles_train, y_train)
+```
+
 ## Computing Fingerprints
 
 All fingerprint functions accept a single SMILES string, a list of SMILES, a pandas Series, or a DataFrame column.

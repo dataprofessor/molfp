@@ -6,6 +6,8 @@ repo_name: dataprofessor/molfp
 
 theme:
   name: material
+  favicon: https://raw.githubusercontent.com/dataprofessor/molfp/main/assets/icon.png
+  logo: https://raw.githubusercontent.com/dataprofessor/molfp/main/assets/icon.png
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -43,6 +45,7 @@ nav:
     - Bioactivity: api/bioactivity.md
     - Activity Cliffs: api/cliffs.md
     - Fusion: api/fusion.md
+    - Isomers: api/isomers.md
     - Scaffold: api/scaffold.md
     - Graph: api/graph.md
     - Feature Selection: api/selection.md

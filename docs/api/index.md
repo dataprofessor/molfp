@@ -10,7 +10,7 @@ import molfp
 
 A cheminformatics project typically starts with computing molecular fingerprints, then moves through understanding what the bits mean, validating data quality, analyzing structure-activity relationships, and finally preparing features for machine learning. The diagram below shows how molfp's modules connect across these stages.
 
-Each module handles one step — from [Fingerprints](#compute) through [Explain & Annotate](#understand), [Collisions](#validate), [Bioactivity](#analyze), [Fusion](#combine), and [Graph](#represent) representations, all the way to [sklearn](#model) transformers ready for pipelines. [Visualization and Standardize](#utilities) support the workflow at any stage.
+Each module handles one step — from [Fingerprints](#compute) through [Explain & Annotate](#understand), [Collisions](#validate), [Bioactivity](#analyze), [Isomers](#analyze), [Fusion](#combine), and [Graph](#represent) representations, all the way to [sklearn](#model) transformers ready for pipelines. [Visualization and Standardize](#utilities) support the workflow at any stage.
 
 ```mermaid
 graph TD
@@ -22,6 +22,7 @@ graph TD
     SD["<b>Similarity & Distance</b>"]
     BA["<b>Bioactivity</b>"]
     AC["<b>Activity Cliffs</b>"]
+    IS["<b>Isomers</b>"]
     FU["<b>Fusion</b>"]
     GR["<b>Graph</b>"]
     FS["<b>Feature Selection</b>"]
@@ -32,6 +33,7 @@ graph TD
     CO --> SD
     IN --> BA
     SD --> AC
+    FP --> IS
     BA & AC --> FU
     FU & SC --> GR & FS & SK
 
@@ -43,6 +45,7 @@ graph TD
     style SD fill:#3b82f6,color:#fff,stroke:#2563eb
     style BA fill:#0d9488,color:#fff,stroke:#0f766e
     style AC fill:#0d9488,color:#fff,stroke:#0f766e
+    style IS fill:#0d9488,color:#fff,stroke:#0f766e
     style FU fill:#0d9488,color:#fff,stroke:#0f766e
     style GR fill:#0d9488,color:#fff,stroke:#0f766e
     style FS fill:#0d9488,color:#fff,stroke:#0f766e
@@ -126,6 +129,15 @@ Find structurally similar molecule pairs with large activity differences — the
 
 ```python
 cliffs = molfp.activity_cliffs(smiles, activities, "ecfp4", sim_threshold=0.8)
+```
+
+### [Isomers](isomers.md)
+
+Test whether fingerprints can distinguish structural isomers. Find identical fingerprint vectors across different molecules.
+
+```python
+molfp.discriminative_power(smiles)
+molfp.find_identical_fps(smiles, "ecfp4")
 ```
 
 ---
