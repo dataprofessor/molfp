@@ -7,7 +7,7 @@
 <a href="https://pypi.org/project/molfp/"><img src="https://img.shields.io/pypi/pyversions/molfp" alt="Python"></a>
 <a href="https://github.com/dataprofessor/molfp/actions/workflows/tests.yml"><img src="https://github.com/dataprofessor/molfp/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
 <a href="https://github.com/dataprofessor/molfp/blob/main/LICENSE"><img src="https://img.shields.io/pypi/l/molfp" alt="License"></a>
-<a href="https://colab.research.google.com/github/dataprofessor/molfp/blob/main/examples/getting_started_colab.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a>
+<a href="https://colab.research.google.com/github/dataprofessor/molfp/blob/main/examples/getting_started.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a>
 </p>
 
 # molfp
