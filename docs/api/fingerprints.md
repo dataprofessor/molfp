@@ -5,6 +5,7 @@
       members:
         - maccs
         - ecfp4
+        - fcfp4
         - pubchem
         - substructure
         - substructure_count
@@ -16,6 +17,10 @@
         - rdk
         - rdk_ext
         - rdk_graphonly
+        - lingo
+        - shortest_path
+        - hybridization
+        - signature
         - atompairs3d
         - atompairs3d_count
         - usr
