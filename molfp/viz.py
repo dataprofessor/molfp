@@ -145,7 +145,7 @@ def _bit_shap_to_atom_weights(mol, smiles, fp_type, shap_per_bit):
 
 def draw_attribution(smiles, interpret_result, *, mode="dual",
                      class_active="active", class_inactive="inactive",
-                     size=(400, 400), alpha=0.5):
+                     size=(400, 400), alpha=0.5, save=None):
     """Draw 2D structure colored by class-specific SHAP attribution.
 
     Args:
@@ -156,11 +156,10 @@ def draw_attribution(smiles, interpret_result, *, mode="dual",
         class_inactive: name of the inactive class in interpret_result.
         size: (width, height) in pixels.
         alpha: transparency of the heatmap overlay.
+        save: file path to save the image (e.g. "attribution.png"). If None, image is not saved.
 
     Returns:
-        PIL.Image.Image (mode="active" or "inactive") or
-        PIL.Image.Image (mode="dual") or
-        tuple of 3 PIL.Image.Image (if mode="all": active, inactive, dual).
+        PIL.Image.Image
     """
     mol = _ensure_mol(smiles)
     AllChem.Compute2DCoords(mol)
@@ -250,14 +249,18 @@ def draw_attribution(smiles, interpret_result, *, mode="dual",
     red = (0.8, 0.1, 0.1)
 
     if mode == "active":
-        return _render(np.clip(active_weights, 0, None), green, green)
+        img = _render(np.clip(active_weights, 0, None), green, green)
     elif mode == "inactive":
-        return _render(np.clip(inactive_weights, 0, None), red, red)
+        img = _render(np.clip(inactive_weights, 0, None), red, red)
     elif mode == "dual":
         dual_weights = active_weights - inactive_weights
-        return _render(dual_weights, green, red)
+        img = _render(dual_weights, green, red)
     else:
         raise ValueError(f"Unknown mode: {mode}. Use 'active', 'inactive', or 'dual'.")
+
+    if save:
+        img.save(save)
+    return img
 
 
 # ── 3D Viewing ───────────────────────────────────────────────────────────────
