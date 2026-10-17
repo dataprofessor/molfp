@@ -147,6 +147,62 @@ def _ecfp4_single(smiles_or_mol, n_bits=1024, collision_free=False):
     AllChem.DataStructs.ConvertToNumpyArray(fp, arr)
     return arr.tolist()
 
+def _fcfp4_single(smiles_or_mol, n_bits=1024, collision_free=False):
+    mol = _ensure_mol(smiles_or_mol)
+    if collision_free:
+        return _multihash_fold(AllChem.GetMorganFingerprint(mol, radius=2, useFeatures=True), n_bits)
+    fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=n_bits, useFeatures=True)
+    arr = np.zeros(n_bits, dtype=np.int32)
+    AllChem.DataStructs.ConvertToNumpyArray(fp, arr)
+    return arr.tolist()
+
+def _lingo_single(smiles_or_mol, n_bits=1024):
+    mol = _ensure_mol(smiles_or_mol)
+    smi = Chem.MolToSmiles(mol)
+    q = 4
+    arr = np.zeros(n_bits, dtype=np.int32)
+    if len(smi) >= q:
+        for i in range(len(smi) - q + 1):
+            h = hash(smi[i:i + q]) % n_bits
+            arr[h] = 1
+    return arr.tolist()
+
+def _shortest_path_single(smiles_or_mol, n_bits=1024):
+    mol = _ensure_mol(smiles_or_mol)
+    dm = Chem.GetDistanceMatrix(mol)
+    n = mol.GetNumAtoms()
+    arr = np.zeros(n_bits, dtype=np.int32)
+    for i in range(n):
+        ai = mol.GetAtomWithIdx(i).GetAtomicNum()
+        for j in range(i + 1, n):
+            aj = mol.GetAtomWithIdx(j).GetAtomicNum()
+            d = int(dm[i][j])
+            h = hash((ai, aj, d)) % n_bits
+            arr[h] = 1
+    return arr.tolist()
+
+def _hybridization_single(smiles_or_mol, n_bits=1024):
+    mol = _ensure_mol(smiles_or_mol)
+    invariants = [int(mol.GetAtomWithIdx(i).GetHybridization()) for i in range(mol.GetNumAtoms())]
+    gen = rdFingerprintGenerator.GetRDKitFPGenerator(maxPath=7, fpSize=n_bits)
+    fp = gen.GetFingerprintAsNumPy(mol, customAtomInvariants=invariants)
+    return fp.tolist()
+
+def _signature_single(smiles_or_mol, n_bits=1024, max_radius=3):
+    mol = _ensure_mol(smiles_or_mol)
+    arr = np.zeros(n_bits, dtype=np.int32)
+    for atom_idx in range(mol.GetNumAtoms()):
+        for r in range(max_radius + 1):
+            env = Chem.FindAtomEnvironmentOfRadiusN(mol, r, atom_idx)
+            if env:
+                submol = Chem.PathToSubmol(mol, env)
+                sig = Chem.MolToSmiles(submol)
+            else:
+                sig = mol.GetAtomWithIdx(atom_idx).GetSymbol()
+            h = hash((sig, r)) % n_bits
+            arr[h] = 1
+    return arr.tolist()
+
 def _multihash_fold(sparse_fp, n_bits, n_hashes=2):
     """Fold a sparse fingerprint using k independent hashes (Bloom filter approach).
 
@@ -500,6 +556,10 @@ def ecfp4(input_data, *, n_bits=1024, collision_free=False, column=None, n_jobs=
     """ECFP4 / Morgan radius=2 fingerprint. Use collision_free=True for multi-hash version."""
     return _versatile(_ecfp4_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits, collision_free=collision_free)
 
+def fcfp4(input_data, *, n_bits=1024, collision_free=False, column=None, n_jobs=1, sparse=False):
+    """FCFP4 / Feature Morgan radius=2 fingerprint. Uses pharmacophoric atom types instead of atomic invariants."""
+    return _versatile(_fcfp4_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits, collision_free=collision_free)
+
 def ecfp4_multihash(input_data, *, n_bits=1024, n_hashes=2, column=None, n_jobs=1, sparse=False):
     """Multi-hash ECFP4 (deprecated — use ecfp4(collision_free=True) instead)."""
     return _versatile(_ecfp4_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits, collision_free=True)
@@ -547,6 +607,22 @@ def rdk_ext(input_data, *, n_bits=1024, collision_free=False, column=None, n_job
 def rdk_graphonly(input_data, *, n_bits=1024, collision_free=False, column=None, n_jobs=1, sparse=False):
     """RDKit GraphOnly fingerprint (1024 bits). Use collision_free=True for multi-hash."""
     return _versatile(_rdk_graphonly_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits, collision_free=collision_free)
+
+def lingo(input_data, *, n_bits=1024, column=None, n_jobs=1, sparse=False):
+    """Lingo fingerprint (hashed SMILES 4-grams)."""
+    return _versatile(_lingo_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits)
+
+def shortest_path(input_data, *, n_bits=1024, column=None, n_jobs=1, sparse=False):
+    """Shortest Path fingerprint — encodes atom-pair features along shortest paths."""
+    return _versatile(_shortest_path_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits)
+
+def hybridization(input_data, *, n_bits=1024, column=None, n_jobs=1, sparse=False):
+    """Hybridization fingerprint — path-based with atom hybridization invariants."""
+    return _versatile(_hybridization_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits)
+
+def signature(input_data, *, n_bits=1024, column=None, n_jobs=1, sparse=False):
+    """Signature fingerprint — atom-centered subgraph descriptors (Faulon signatures)."""
+    return _versatile(_signature_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits)
 
 def atompairs3d(input_data, *, n_bits=780, collision_free=False, column=None, n_jobs=1, sparse=False):
     """3D Atom Pairs fingerprint (780 bits). Use collision_free=True for multi-hash."""
@@ -709,6 +785,7 @@ def getaway_batch(smiles_list, n_jobs=1, sparse=False):
 FINGERPRINTS = {
     "maccs": (_maccs_single, 166, "MACCS Keys"),
     "ecfp4": (_ecfp4_single, 1024, "ECFP4 (Morgan r=2)"),
+    "fcfp4": (_fcfp4_single, 1024, "FCFP4 (Feature Morgan r=2)"),
     "pubchem": (_pubchem_single, 881, "PubChem/CACTVS"),
     "substructure": (_substructure_single, 307, "SubstructureFP (Inte:Ligand)"),
     "substructure_count": (_substructure_count_single, 307, "Substructure Count"),
@@ -720,6 +797,10 @@ FINGERPRINTS = {
     "rdk": (_rdk_single, 1024, "RDKit path-based"),
     "rdk_ext": (_rdk_ext_single, 1024, "RDKit Extended"),
     "rdk_graphonly": (_rdk_graphonly_single, 1024, "RDKit GraphOnly"),
+    "lingo": (_lingo_single, 1024, "Lingo (SMILES 4-grams)"),
+    "shortest_path": (_shortest_path_single, 1024, "Shortest Path"),
+    "hybridization": (_hybridization_single, 1024, "Hybridization"),
+    "signature": (_signature_single, 1024, "Signature (atom-centered subgraphs)"),
     "atompairs3d": (_atompairs3d_single, 780, "3D Atom Pairs"),
     "atompairs3d_count": (_atompairs3d_count_single, 780, "3D Atom Pairs Count"),
     "usr": (_usr_single, 12, "Ultrafast Shape Recognition"),

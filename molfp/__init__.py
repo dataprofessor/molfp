@@ -43,6 +43,7 @@ from .fingerprints import (
     maccs,
     ecfp4,
     ecfp4_multihash,
+    fcfp4,
     pubchem,
     substructure,
     substructure_count,
@@ -54,6 +55,10 @@ from .fingerprints import (
     rdk,
     rdk_ext,
     rdk_graphonly,
+    lingo,
+    shortest_path,
+    hybridization,
+    signature,
     atompairs3d,
     atompairs3d_count,
     usr,
@@ -110,11 +115,12 @@ from .standardize import (
     smiles_to_mol, mol_to_smiles,
 )
 from .sklearn import (
-    MACCSTransformer, ECFPTransformer, PubChemTransformer,
+    MACCSTransformer, ECFPTransformer, FCFPTransformer, PubChemTransformer,
     SubstructureTransformer, SubstructureCountTransformer,
     KlekotaRothTransformer, KlekotaRothCountTransformer,
     EStateTransformer, AtomPairs2DTransformer, AtomPairs2DCountTransformer,
     RDKTransformer, RDKExtTransformer, RDKGraphOnlyTransformer,
+    LingoTransformer, ShortestPathTransformer, HybridizationTransformer, SignatureTransformer,
     AtomPairs3DTransformer, AtomPairs3DCountTransformer,
     get_transformer, TRANSFORMERS,
 )

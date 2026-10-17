@@ -108,6 +108,101 @@ class ECFPTransformer(BaseEstimator, TransformerMixin):
         return np.array([f"ECFP4_{i}" for i in range(self.n_bits)])
 
 
+class FCFPTransformer(BaseEstimator, TransformerMixin):
+    """FCFP4 / Feature Morgan (configurable bits) sklearn transformer."""
+
+    def __init__(self, n_bits=1024, n_jobs=1, sparse=False):
+        self.n_bits = n_bits
+        self.n_jobs = n_jobs
+        self.sparse = sparse
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        fn = lambda s: fp_mod._fcfp4_single(s, n_bits=self.n_bits)
+        return fp_mod._batch(fn, X, n_jobs=self.n_jobs, sparse=self.sparse)
+
+    def get_feature_names_out(self, input_features=None):
+        return np.array([f"FCFP4_{i}" for i in range(self.n_bits)])
+
+
+class LingoTransformer(BaseEstimator, TransformerMixin):
+    """Lingo (hashed SMILES 4-grams) sklearn transformer."""
+
+    def __init__(self, n_bits=1024, n_jobs=1, sparse=False):
+        self.n_bits = n_bits
+        self.n_jobs = n_jobs
+        self.sparse = sparse
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        fn = lambda s: fp_mod._lingo_single(s, n_bits=self.n_bits)
+        return fp_mod._batch(fn, X, n_jobs=self.n_jobs, sparse=self.sparse)
+
+    def get_feature_names_out(self, input_features=None):
+        return np.array([f"Lingo_{i}" for i in range(self.n_bits)])
+
+
+class ShortestPathTransformer(BaseEstimator, TransformerMixin):
+    """Shortest Path sklearn transformer."""
+
+    def __init__(self, n_bits=1024, n_jobs=1, sparse=False):
+        self.n_bits = n_bits
+        self.n_jobs = n_jobs
+        self.sparse = sparse
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        fn = lambda s: fp_mod._shortest_path_single(s, n_bits=self.n_bits)
+        return fp_mod._batch(fn, X, n_jobs=self.n_jobs, sparse=self.sparse)
+
+    def get_feature_names_out(self, input_features=None):
+        return np.array([f"ShortPath_{i}" for i in range(self.n_bits)])
+
+
+class HybridizationTransformer(BaseEstimator, TransformerMixin):
+    """Hybridization fingerprint sklearn transformer."""
+
+    def __init__(self, n_bits=1024, n_jobs=1, sparse=False):
+        self.n_bits = n_bits
+        self.n_jobs = n_jobs
+        self.sparse = sparse
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        fn = lambda s: fp_mod._hybridization_single(s, n_bits=self.n_bits)
+        return fp_mod._batch(fn, X, n_jobs=self.n_jobs, sparse=self.sparse)
+
+    def get_feature_names_out(self, input_features=None):
+        return np.array([f"Hybrid_{i}" for i in range(self.n_bits)])
+
+
+class SignatureTransformer(BaseEstimator, TransformerMixin):
+    """Signature fingerprint sklearn transformer."""
+
+    def __init__(self, n_bits=1024, n_jobs=1, sparse=False):
+        self.n_bits = n_bits
+        self.n_jobs = n_jobs
+        self.sparse = sparse
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        fn = lambda s: fp_mod._signature_single(s, n_bits=self.n_bits)
+        return fp_mod._batch(fn, X, n_jobs=self.n_jobs, sparse=self.sparse)
+
+    def get_feature_names_out(self, input_features=None):
+        return np.array([f"Sig_{i}" for i in range(self.n_bits)])
+
+
 class AtomPairs2DTransformer(BaseEstimator, TransformerMixin):
     """AtomPairs2D (configurable bits) sklearn transformer."""
 
@@ -248,6 +343,7 @@ class AtomPairs3DCountTransformer(BaseEstimator, TransformerMixin):
 TRANSFORMERS = {
     "maccs": MACCSTransformer,
     "ecfp4": ECFPTransformer,
+    "fcfp4": FCFPTransformer,
     "pubchem": PubChemTransformer,
     "substructure": SubstructureTransformer,
     "substructure_count": SubstructureCountTransformer,
@@ -259,6 +355,10 @@ TRANSFORMERS = {
     "rdk": RDKTransformer,
     "rdk_ext": RDKExtTransformer,
     "rdk_graphonly": RDKGraphOnlyTransformer,
+    "lingo": LingoTransformer,
+    "shortest_path": ShortestPathTransformer,
+    "hybridization": HybridizationTransformer,
+    "signature": SignatureTransformer,
     "atompairs3d": AtomPairs3DTransformer,
     "atompairs3d_count": AtomPairs3DCountTransformer,
 }
