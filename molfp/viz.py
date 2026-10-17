@@ -251,9 +251,15 @@ def draw_attribution(smiles, interpret_result, *, mode="dual",
     if mode == "active":
         img = _render(np.clip(active_weights, 0, None), green, green)
     elif mode == "inactive":
-        img = _render(np.clip(inactive_weights, 0, None), red, red)
+        # Inactive SHAP values are typically negative (pushes away from active),
+        # so we negate to get positive weights for atoms that drive inactivity
+        img = _render(np.clip(-inactive_weights, 0, None), red, red)
     elif mode == "dual":
-        dual_weights = active_weights - inactive_weights
+        # Combine: positive = active-driving (green), negative = inactive-driving (red)
+        active_pos = np.clip(active_weights, 0, None)
+        inactive_pos = np.clip(-inactive_weights, 0, None)
+        # Merge into single weight vector: green where active dominates, red where inactive dominates
+        dual_weights = active_pos - inactive_pos
         img = _render(dual_weights, green, red)
     else:
         raise ValueError(f"Unknown mode: {mode}. Use 'active', 'inactive', or 'dual'.")
