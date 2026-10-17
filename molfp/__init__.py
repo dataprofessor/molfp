@@ -1,7 +1,7 @@
 """
 molfp — Interpretable molecular fingerprints with SHAP-driven chemical explanations.
 
-30 fingerprint types (13 2D + 9 3D + 8 graph) plus analysis modules:
+35 fingerprint types (18 2D + 9 3D + 8 graph) plus analysis modules:
   - explain/annotate: bit-level explainability and chemical annotation
   - interpret: SHAP interpretation with chemical meaning
   - collisions: hash collision detection, removal, and collision-free mode

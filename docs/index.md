@@ -14,7 +14,7 @@
 
 **Interpretable molecular fingerprints with SHAP-driven chemical explanations.**
 
-A native Python/RDKit library that computes 30 molecular fingerprint types (13 2D + 9 3D + 8 graph-based) and provides built-in tools for interpretation, visualization, collision detection, activity cliff analysis, bioactivity profiling, and SHAP-based feature explanation.
+A native Python/RDKit library that computes 35 molecular fingerprint types (18 2D + 9 3D + 8 graph-based) and provides built-in tools for interpretation, visualization, collision detection, activity cliff analysis, bioactivity profiling, and SHAP-based feature explanation.
 
 ## Install
 
@@ -45,7 +45,7 @@ result = molfp.scaffold_split(smiles, test_size=0.2)
 
 ## Features
 
-- **30 fingerprint types** — 13 2D, 9 3D, 8 graph-based
+- **35 fingerprint types** — 18 2D, 9 3D, 8 graph-based
 - **Bit-level explainability** — atom attribution for every ON bit
 - **Chemical annotation** — human-readable names for fingerprint bits
 - **SHAP interpretation** — collision-aware feature importance with chemical meaning
@@ -86,9 +86,9 @@ molfp.view3d("CN1C=NC2=C1C(=O)N(C(=O)N2C)C", style="ball_and_stick", spin=True)
 <img src="https://raw.githubusercontent.com/dataprofessor/molfp/main/assets/view3d_notebook.png" alt="3D interactive viewer" width="600">
 </p>
 
-## 30 Fingerprint Types
+## 35 Fingerprint Types
 
-### 2D Fingerprints (13 types)
+### 2D Fingerprints (18 types)
 
 | Type | Bits | Function |
 |------|------|----------|
@@ -105,6 +105,11 @@ molfp.view3d("CN1C=NC2=C1C(=O)N(C(=O)N2C)C", style="ball_and_stick", spin=True)
 | RDK | 1024 | `rdk()` |
 | RDK Extended | 1024 | `rdk_ext()` |
 | RDK GraphOnly | 1024 | `rdk_graphonly()` |
+| FCFP4 (Feature Morgan) | 1024 | `fcfp4()` |
+| Lingo | 1024 | `lingo()` |
+| Shortest Path | 1024 | `shortest_path()` |
+| Hybridization | 1024 | `hybridization()` |
+| Signature | 1024 | `signature()` |
 
 ### 3D Fingerprints (9 types)
 

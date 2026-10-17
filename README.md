@@ -15,7 +15,7 @@
 
 **Interpretable molecular fingerprints with SHAP-driven chemical explanations.**
 
-A native Python/RDKit library that computes 30 molecular fingerprint types (13 2D + 9 3D + 8 graph-based) and provides built-in tools for interpretation, visualization, collision detection, activity cliff analysis, bioactivity profiling, and SHAP-based feature explanation — capabilities not found in any other fingerprint library.
+A native Python/RDKit library that computes 35 molecular fingerprint types (18 2D + 9 3D + 8 graph-based) and provides built-in tools for interpretation, visualization, collision detection, activity cliff analysis, bioactivity profiling, and SHAP-based feature explanation — capabilities not found in any other fingerprint library.
 
 ## Install
 
@@ -93,9 +93,9 @@ Uses adaptive conformer optimization (MMFF94) to generate optimized 3D structure
 
 ## Features
 
-### 30 Fingerprint Types
+### 35 Fingerprint Types
 
-#### 2D Fingerprints (13 types)
+#### 2D Fingerprints (18 types)
 
 | Type | Bits | Function |
 |------|------|----------|
@@ -112,6 +112,11 @@ Uses adaptive conformer optimization (MMFF94) to generate optimized 3D structure
 | RDKit path-based | 1024 | `molfp.rdk()` |
 | RDKit Extended | 1024 | `molfp.rdk_ext()` |
 | RDKit GraphOnly | 1024 | `molfp.rdk_graphonly()` |
+| FCFP4 (Feature Morgan) | 1024 | `molfp.fcfp4()` |
+| Lingo | 1024 | `molfp.lingo()` |
+| Shortest Path | 1024 | `molfp.shortest_path()` |
+| Hybridization | 1024 | `molfp.hybridization()` |
+| Signature | 1024 | `molfp.signature()` |
 
 #### 3D Fingerprints (9 types)
 
@@ -254,7 +259,7 @@ molfp.pairwise(X, metric="tanimoto") # (N, N_bits) → (N, N) matrix (vectorized
 
 ### scikit-learn Compatible
 
-All 30 FP types as sklearn transformers with Pipeline, GridSearchCV, and FeatureUnion support:
+All 35 FP types as sklearn transformers with Pipeline, GridSearchCV, and FeatureUnion support:
 
 ```python
 from sklearn.pipeline import make_pipeline

@@ -60,7 +60,7 @@ Browse the modules below for function details and examples.
 
 ### [Fingerprints](fingerprints.md)
 
-Compute 30 molecular fingerprint types (13 2D + 9 3D + 8 graph). Every function accepts a single SMILES, a list, a pandas Series, or a DataFrame column.
+Compute 35 molecular fingerprint types (18 2D + 9 3D + 8 graph). Every function accepts a single SMILES, a list, a pandas Series, or a DataFrame column.
 
 ```python
 fp = molfp.maccs("CCO")

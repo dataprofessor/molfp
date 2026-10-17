@@ -12,7 +12,7 @@
 ### New Fingerprint Types
 - 9 3D fingerprints: USR, USRCAT, Autocorr3D, RDF, MORSE, WHIM, GETAWAY, PEOE_VSA3D, SMR_VSA3D
 - 8 graph fingerprints: standard, distance, line, fragment (each with base and enriched variants)
-- Total: 30 fingerprint types (13 2D + 9 3D + 8 graph)
+- Total: 35 fingerprint types (18 2D + 9 3D + 8 graph)
 
 ### New Modules
 - **scaffold**: `scaffold()`, `scaffold_fingerprint()`, `scaffold_split()` — Murcko/generic scaffold extraction with ~130 named ring systems, scaffold-aware train/test splitting
