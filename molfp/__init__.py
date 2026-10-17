@@ -129,7 +129,7 @@ from .distance import (
     tanimoto, dice, cosine, sokal_michener, russel_rao,
     distance, pairwise, pairwise_distance, available_metrics,
 )
-from .viz import draw, view3d
+from .viz import draw, view3d, draw_attribution
 from .graph import (
     mol_graph, to_pyg, to_dgl, graphs_to_pyg,
     atom_feature_names, edge_feature_names,
