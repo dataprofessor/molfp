@@ -40,6 +40,7 @@ class TestCoreFingerprints:
     @pytest.mark.parametrize("fp_name,expected_len", [
         ("maccs", 166),
         ("ecfp4", 1024),
+        ("fcfp4", 1024),
         ("pubchem", 881),
         ("substructure", 307),
         ("substructure_count", 307),
@@ -51,6 +52,10 @@ class TestCoreFingerprints:
         ("rdk", 1024),
         ("rdk_ext", 1024),
         ("rdk_graphonly", 1024),
+        ("lingo", 1024),
+        ("shortest_path", 1024),
+        ("hybridization", 1024),
+        ("signature", 1024),
     ])
     def test_fingerprint_length(self, fp_name, expected_len):
         fn, n_bits, desc = molfp.get(fp_name)
@@ -59,8 +64,9 @@ class TestCoreFingerprints:
         assert n_bits == expected_len
 
     @pytest.mark.parametrize("fp_name", [
-        "maccs", "ecfp4", "pubchem", "substructure", "estate",
+        "maccs", "ecfp4", "fcfp4", "pubchem", "substructure", "estate",
         "atompairs2d", "rdk", "rdk_ext", "rdk_graphonly",
+        "lingo", "shortest_path", "hybridization", "signature",
     ])
     def test_binary_fp_values_are_0_or_1(self, fp_name):
         fn = molfp.get(fp_name)[0]
@@ -2155,6 +2161,129 @@ class TestScaffold:
         result = molfp.scaffold_split(smiles, test_size=0.2)
         actual_ratio = result["n_test"] / (result["n_train"] + result["n_test"])
         assert 0.05 <= actual_ratio <= 0.5  # approximate
+
+
+
+# =============================================================================
+# NEW 2D FINGERPRINTS (FCFP4, Lingo, ShortestPath, Hybridization, Signature)
+# =============================================================================
+
+class TestNewFingerprints:
+
+    # ── FCFP4 ────────────────────────────────────────────────────────────────
+
+    def test_fcfp4_single(self):
+        fp = molfp.fcfp4(ASPIRIN)
+        assert len(fp) == 1024
+        assert sum(fp) > 0
+
+    def test_fcfp4_batch(self):
+        fps = molfp.fcfp4(SMILES_SET)
+        assert fps.shape == (len(SMILES_SET), 1024)
+
+    def test_fcfp4_differs_from_ecfp4(self):
+        fp_ecfp = molfp.ecfp4(ASPIRIN)
+        fp_fcfp = molfp.fcfp4(ASPIRIN)
+        assert fp_ecfp != fp_fcfp
+
+    def test_fcfp4_collision_free(self):
+        fp_std = molfp.fcfp4(ASPIRIN)
+        fp_cf = molfp.fcfp4(ASPIRIN, collision_free=True)
+        assert len(fp_cf) == 1024
+        assert sum(fp_cf) >= sum(fp_std)
+
+    def test_fcfp4_custom_bits(self):
+        fp = molfp.fcfp4(ASPIRIN, n_bits=2048)
+        assert len(fp) == 2048
+
+    def test_fcfp4_transformer(self):
+        t = molfp.FCFPTransformer()
+        X = t.fit_transform(SMILES_SET)
+        assert X.shape == (len(SMILES_SET), 1024)
+
+    # ── Lingo ────────────────────────────────────────────────────────────────
+
+    def test_lingo_single(self):
+        fp = molfp.lingo(ASPIRIN)
+        assert len(fp) == 1024
+        assert sum(fp) > 0
+
+    def test_lingo_short_smiles(self):
+        fp = molfp.lingo("CO")
+        assert len(fp) == 1024
+        assert sum(fp) == 0  # SMILES "CO" is only 2 chars, less than q=4
+
+    def test_lingo_batch(self):
+        fps = molfp.lingo(SMILES_SET)
+        assert fps.shape == (len(SMILES_SET), 1024)
+
+    def test_lingo_transformer(self):
+        t = molfp.LingoTransformer()
+        X = t.fit_transform(SMILES_SET)
+        assert X.shape == (len(SMILES_SET), 1024)
+
+    # ── Shortest Path ────────────────────────────────────────────────────────
+
+    def test_shortest_path_single(self):
+        fp = molfp.shortest_path(ASPIRIN)
+        assert len(fp) == 1024
+        assert sum(fp) > 0
+
+    def test_shortest_path_batch(self):
+        fps = molfp.shortest_path(SMILES_SET)
+        assert fps.shape == (len(SMILES_SET), 1024)
+
+    def test_shortest_path_small_molecule(self):
+        fp = molfp.shortest_path(ETHANOL)
+        assert len(fp) == 1024
+        assert sum(fp) > 0
+
+    def test_shortest_path_transformer(self):
+        t = molfp.ShortestPathTransformer()
+        X = t.fit_transform(SMILES_SET)
+        assert X.shape == (len(SMILES_SET), 1024)
+
+    # ── Hybridization ────────────────────────────────────────────────────────
+
+    def test_hybridization_single(self):
+        fp = molfp.hybridization(ASPIRIN)
+        assert len(fp) == 1024
+        assert sum(fp) > 0
+
+    def test_hybridization_batch(self):
+        fps = molfp.hybridization(SMILES_SET)
+        assert fps.shape == (len(SMILES_SET), 1024)
+
+    def test_hybridization_differs_from_rdk(self):
+        fp_rdk = molfp.rdk(ASPIRIN)
+        fp_hyb = molfp.hybridization(ASPIRIN)
+        assert fp_rdk != fp_hyb
+
+    def test_hybridization_transformer(self):
+        t = molfp.HybridizationTransformer()
+        X = t.fit_transform(SMILES_SET)
+        assert X.shape == (len(SMILES_SET), 1024)
+
+    # ── Signature ────────────────────────────────────────────────────────────
+
+    def test_signature_single(self):
+        fp = molfp.signature(ASPIRIN)
+        assert len(fp) == 1024
+        assert sum(fp) > 0
+
+    def test_signature_batch(self):
+        fps = molfp.signature(SMILES_SET)
+        assert fps.shape == (len(SMILES_SET), 1024)
+
+    def test_signature_deterministic(self):
+        fp1 = molfp.signature(ASPIRIN)
+        fp2 = molfp.signature(ASPIRIN)
+        assert fp1 == fp2
+
+    def test_signature_transformer(self):
+        t = molfp.SignatureTransformer()
+        X = t.fit_transform(SMILES_SET)
+        assert X.shape == (len(SMILES_SET), 1024)
 
 
 # =============================================================================
