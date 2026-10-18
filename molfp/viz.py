@@ -223,16 +223,16 @@ def draw_attribution(smiles, interpret_result, *,
         buf.seek(0)
         return PILImage.open(buf).copy()
 
-    # ── Highlight style (atom/bond circles with blended colors) ────────────
+    # ── Highlight style (solid atom/bond circles) ──────────────────────────
     def _render_highlight(weights, color_pos, color_neg):
         from rdkit.Chem.Draw import rdMolDraw2D
-        from PIL import Image as PILImage, ImageFilter
+        from PIL import Image as PILImage
         from io import BytesIO
 
         max_w = max(abs(weights.max()), abs(weights.min()), 1e-8)
         norm = weights / max_w
 
-        def _color_for_weight(w, color_pos, color_neg):
+        def _color_for_weight(w):
             if abs(w) < 0.05:
                 return None
             color = color_pos if w > 0 else color_neg
@@ -245,12 +245,11 @@ def draw_attribution(smiles, interpret_result, *,
         highlight_atoms = []
         highlight_colors = {}
         for i, w in enumerate(norm):
-            c = _color_for_weight(w, color_pos, color_neg)
+            c = _color_for_weight(w)
             if c is not None:
                 highlight_atoms.append(i)
                 highlight_colors[i] = c
 
-        # Color bonds — blend between the two atom colors
         highlight_bonds = []
         highlight_bond_colors = {}
         highlight_atom_set = set(highlight_atoms)
@@ -260,21 +259,17 @@ def draw_attribution(smiles, interpret_result, *,
             if a1 in highlight_atom_set or a2 in highlight_atom_set:
                 bond_idx = bond.GetIdx()
                 highlight_bonds.append(bond_idx)
-                w1 = norm[a1] if a1 < len(norm) else 0
-                w2 = norm[a2] if a2 < len(norm) else 0
-                avg_w = (w1 + w2) / 2
-                c = _color_for_weight(avg_w, color_pos, color_neg)
+                avg_w = (norm[a1] + norm[a2]) / 2
+                c = _color_for_weight(avg_w)
                 if c is None:
                     c = (0.95, 0.95, 0.95)
                 highlight_bond_colors[bond_idx] = c
 
-        # Draw with highlights
         try:
             drawer = rdMolDraw2D.MolDraw2DCairo(size[0], size[1])
         except Exception:
             drawer = rdMolDraw2D.MolDraw2DSVG(size[0], size[1])
-        opts = drawer.drawOptions()
-        opts.clearBackground = True
+        drawer.drawOptions().clearBackground = True
 
         highlight_radii = {i: 0.4 for i in highlight_atoms}
         drawer.DrawMolecule(
@@ -287,45 +282,7 @@ def draw_attribution(smiles, interpret_result, *,
         )
         drawer.FinishDrawing()
         png = drawer.GetDrawingText()
-        raw_img = PILImage.open(BytesIO(png)).convert("RGBA").copy()
-
-        # Light gaussian blur on the highlight regions only (not molecule lines)
-        # Extract just the colored highlight areas, blur them, then re-composite
-        from PIL import Image as PILImage2
-        
-        # Re-draw molecule without highlights for clean lines
-        try:
-            drawer2 = rdMolDraw2D.MolDraw2DCairo(size[0], size[1])
-        except Exception:
-            drawer2 = rdMolDraw2D.MolDraw2DSVG(size[0], size[1])
-        drawer2.drawOptions().clearBackground = True
-        drawer2.DrawMolecule(mol)
-        drawer2.FinishDrawing()
-        clean_png = drawer2.GetDrawingText()
-        clean_img = PILImage.open(BytesIO(clean_png)).convert("RGBA").copy()
-
-        # Get highlight-only layer: difference between highlighted and clean
-        # Simpler: blur the highlighted image, then paste clean molecule on top
-        blur_r = max(int(size[0] * 0.008), 1)
-        r, g, b, a = raw_img.split()
-        r = r.filter(ImageFilter.GaussianBlur(blur_r))
-        g = g.filter(ImageFilter.GaussianBlur(blur_r))
-        b = b.filter(ImageFilter.GaussianBlur(blur_r))
-        blurred_bg = PILImage.merge("RGBA", (r, g, b, a))
-
-        # Make clean molecule background transparent
-        clean_data = clean_img.getdata()
-        new_data = []
-        for item in clean_data:
-            if item[0] > 245 and item[1] > 245 and item[2] > 245:
-                new_data.append((255, 255, 255, 0))
-            else:
-                new_data.append(item)
-        clean_img.putdata(new_data)
-
-        # Composite: blurred highlights + sharp molecule lines
-        result = PILImage.alpha_composite(blurred_bg, clean_img)
-        return result.convert("RGB")
+        return PILImage.open(BytesIO(png)).copy()
 
     green = (0.13, 0.55, 0.13)
     red = (0.8, 0.1, 0.1)
