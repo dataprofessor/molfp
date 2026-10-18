@@ -36,7 +36,7 @@ Usage:
     result = molfp.interpret(smiles, activities, fp_type="ecfp4", collision_aware=True)
 """
 
-__version__ = "0.3.2"
+__version__ = "0.3.3"
 
 # ── Core fingerprint functions ────────────────────────────────────────────────
 from .fingerprints import (
