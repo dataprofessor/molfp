@@ -13,9 +13,10 @@ from __future__ import annotations
 from typing import Union
 
 import numpy as np
-from rdkit import Chem
+from rdkit import Chem, DataStructs
 from rdkit.Chem import AllChem, MACCSkeys, RDKFingerprint, rdMolDescriptors, rdFingerprintGenerator
 from rdkit.Chem.EState.Fingerprinter import FingerprintMol
+from rdkit.Avalon import pyAvalonTools
 
 from . import _smarts
 from ._pubchem import PubChemComputer
@@ -201,6 +202,66 @@ def _signature_single(smiles_or_mol, n_bits=1024, max_radius=3):
                 sig = mol.GetAtomWithIdx(atom_idx).GetSymbol()
             h = hash((sig, r)) % n_bits
             arr[h] = 1
+    return arr.tolist()
+
+def _topological_torsion_single(smiles_or_mol, n_bits=2048):
+    mol = _ensure_mol(smiles_or_mol)
+    fp = rdMolDescriptors.GetHashedTopologicalTorsionFingerprintAsBitVect(mol, nBits=n_bits)
+    arr = np.zeros(n_bits, dtype=np.int32)
+    DataStructs.ConvertToNumpyArray(fp, arr)
+    return arr.tolist()
+
+def _avalon_single(smiles_or_mol, n_bits=1024):
+    mol = _ensure_mol(smiles_or_mol)
+    fp = pyAvalonTools.GetAvalonFP(mol, nBits=n_bits)
+    arr = np.zeros(n_bits, dtype=np.int32)
+    DataStructs.ConvertToNumpyArray(fp, arr)
+    return arr.tolist()
+
+def _mhfp_single(smiles_or_mol, n_bits=1024, radius=3):
+    mol = _ensure_mol(smiles_or_mol)
+    info = {}
+    AllChem.GetMorganFingerprint(mol, radius, bitInfo=info)
+    shingles = set()
+    for bit, envs in info.items():
+        for atom_idx, r in envs:
+            env = Chem.FindAtomEnvironmentOfRadiusN(mol, r, atom_idx)
+            if env:
+                submol = Chem.PathToSubmol(mol, env)
+                shingles.add(Chem.MolToSmiles(submol))
+            else:
+                shingles.add(mol.GetAtomWithIdx(atom_idx).GetSymbol())
+    arr = np.zeros(n_bits, dtype=np.int32)
+    for s in shingles:
+        arr[hash(s) % n_bits] = 1
+    return arr.tolist()
+
+def _map4_single(smiles_or_mol, n_bits=1024, radius=2):
+    mol = _ensure_mol(smiles_or_mol)
+    info = {}
+    AllChem.GetMorganFingerprint(mol, radius, bitInfo=info)
+    atom_envs = {}
+    for bit, envs in info.items():
+        for atom_idx, r in envs:
+            env = Chem.FindAtomEnvironmentOfRadiusN(mol, r, atom_idx)
+            if env:
+                submol = Chem.PathToSubmol(mol, env)
+                smi = Chem.MolToSmiles(submol)
+            else:
+                smi = mol.GetAtomWithIdx(atom_idx).GetSymbol()
+            if atom_idx not in atom_envs or r > atom_envs[atom_idx][1]:
+                atom_envs[atom_idx] = (smi, r)
+    dm = Chem.GetDistanceMatrix(mol)
+    n_atoms = mol.GetNumAtoms()
+    arr = np.zeros(n_bits, dtype=np.int32)
+    atom_list = list(atom_envs.keys())
+    for i in range(len(atom_list)):
+        for j in range(i + 1, len(atom_list)):
+            a1, a2 = atom_list[i], atom_list[j]
+            d = int(dm[a1][a2])
+            s1, s2 = atom_envs[a1][0], atom_envs[a2][0]
+            pair = f"{min(s1,s2)}|{d}|{max(s1,s2)}"
+            arr[hash(pair) % n_bits] = 1
     return arr.tolist()
 
 def _multihash_fold(sparse_fp, n_bits, n_hashes=2):
@@ -624,6 +685,22 @@ def signature(input_data, *, n_bits=1024, column=None, n_jobs=1, sparse=False):
     """Signature fingerprint — atom-centered subgraph descriptors (Faulon signatures)."""
     return _versatile(_signature_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits)
 
+def topological_torsion(input_data, *, n_bits=2048, column=None, n_jobs=1, sparse=False):
+    """Topological Torsion fingerprint (2048 bits) — encodes sequences of 4 bonded atoms."""
+    return _versatile(_topological_torsion_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits)
+
+def avalon(input_data, *, n_bits=1024, column=None, n_jobs=1, sparse=False):
+    """Avalon fingerprint (1024 bits) — path-based count fingerprint."""
+    return _versatile(_avalon_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits)
+
+def mhfp(input_data, *, n_bits=1024, column=None, n_jobs=1, sparse=False):
+    """MHFP (MinHashed Fingerprint) — hashed circular substructure shingles."""
+    return _versatile(_mhfp_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits)
+
+def map4(input_data, *, n_bits=1024, column=None, n_jobs=1, sparse=False):
+    """MAP4 (MinHashed Atom Pair) — hashed atom-pair substructures at radius 2."""
+    return _versatile(_map4_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits)
+
 def atompairs3d(input_data, *, n_bits=780, collision_free=False, column=None, n_jobs=1, sparse=False):
     """3D Atom Pairs fingerprint (780 bits). Use collision_free=True for multi-hash."""
     return _versatile(_atompairs3d_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits, collision_free=collision_free)
@@ -801,6 +878,10 @@ FINGERPRINTS = {
     "shortest_path": (_shortest_path_single, 1024, "Shortest Path"),
     "hybridization": (_hybridization_single, 1024, "Hybridization"),
     "signature": (_signature_single, 1024, "Signature (atom-centered subgraphs)"),
+    "topological_torsion": (_topological_torsion_single, 2048, "Topological Torsion"),
+    "avalon": (_avalon_single, 1024, "Avalon"),
+    "mhfp": (_mhfp_single, 1024, "MHFP (MinHashed Fingerprint)"),
+    "map4": (_map4_single, 1024, "MAP4 (MinHashed Atom Pair r=2)"),
     "atompairs3d": (_atompairs3d_single, 780, "3D Atom Pairs"),
     "atompairs3d_count": (_atompairs3d_count_single, 780, "3D Atom Pairs Count"),
     "usr": (_usr_single, 12, "Ultrafast Shape Recognition"),
