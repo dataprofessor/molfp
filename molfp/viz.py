@@ -331,8 +331,10 @@ def view3d(input_data, *, style="stick", size=(600, 400), spin=False,
         size: (width, height) in pixels.
         spin: if True, auto-rotate the molecule (py3Dmol only; speck uses autoRotate).
         background: background color (default "white", py3Dmol only).
-        preset: Speck preset ("default", "matte", "glossy", "toon", "cover",
-                "metal", "glass", "goodsell"). Only used with style="speck".
+        preset: Speck preset. molfp presets: "ball_and_stick" (default look),
+                "toon" (flat shading + outlines), "licorice" (stick model).
+                ipyspeck presets: "default", "matte", "glossy", "cover",
+                "metal", "glass", "goodsell".
         atom_scale: Speck atom radius (0.0-1.0, default 0.24 for ball-and-stick).
         bond_scale: Speck bond radius (0.0-1.0, default 0.5).
         ao: Speck ambient occlusion strength (0.0-1.0, default 0.75).
@@ -404,9 +406,35 @@ def _view3d_speck(input_data, *, size=(600, 400), spin=False, preset=None,
     w.layout.width = f"{size[0]}px"
     w.layout.height = f"{size[1]}px"
 
-    # Apply preset first (if any), then user overrides
+    # molfp custom presets (applied before ipyspeck presets)
+    _MOLFP_PRESETS = {
+        "ball_and_stick": {
+            "atomScale": 0.24, "relativeAtomScale": 0.64, "atomShade": 0.5,
+            "bonds": True, "bondScale": 0.5, "bondShade": 0.5,
+            "ao": 0.75, "brightness": 0.5, "outline": 0.0,
+            "dofStrength": 0.0,
+        },
+        "toon": {
+            "atomScale": 0.24, "relativeAtomScale": 0.64, "atomShade": 0.5,
+            "bonds": True, "bondScale": 0.5, "bondShade": 0.5,
+            "ao": 0.0, "brightness": 0.5, "outline": 1.0,
+            "dofStrength": 0.0,
+        },
+        "licorice": {
+            "atomScale": 0.1, "relativeAtomScale": 0.0, "atomShade": 0.5,
+            "bonds": True, "bondScale": 1.0, "bondShade": 0.5,
+            "ao": 0.75, "brightness": 0.5, "outline": 0.0,
+            "dofStrength": 0.0,
+        },
+    }
+
+    # Apply preset
     if preset:
-        w.apply_preset(preset)
+        if preset in _MOLFP_PRESETS:
+            for key, value in _MOLFP_PRESETS[preset].items():
+                setattr(w, key, value)
+        else:
+            w.apply_preset(preset)
 
     # Apply user-specified parameters (override preset/defaults)
     if atom_scale is not None:
