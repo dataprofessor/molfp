@@ -387,6 +387,13 @@ TRANSFORMERS = {
         "get_feature_names_out": lambda self, input_features=None: np.array([f"MAP4_{i}" for i in range(self.n_bits)]),
         "__doc__": "MAP4 (MinHashed Atom Pair) sklearn transformer.",
     }),
+    "map4c": type("MAP4CTransformer", (BaseEstimator, TransformerMixin), {
+        "__init__": lambda self, n_bits=1024, n_jobs=1, sparse=False: [setattr(self, k, v) for k, v in {"n_bits": n_bits, "n_jobs": n_jobs, "sparse": sparse}.items()] and None,
+        "fit": lambda self, X, y=None: self,
+        "transform": lambda self, X: fp_mod._batch(lambda s: fp_mod._map4c_single(s, n_bits=self.n_bits), X, n_jobs=self.n_jobs, sparse=self.sparse),
+        "get_feature_names_out": lambda self, input_features=None: np.array([f"MAP4C_{i}" for i in range(self.n_bits)]),
+        "__doc__": "MAP4C (MinHashed Atom Pair Chiral) sklearn transformer.",
+    }),
     "atompairs3d": AtomPairs3DTransformer,
     "atompairs3d_count": AtomPairs3DCountTransformer,
 }

@@ -264,6 +264,21 @@ def _map4_single(smiles_or_mol, n_bits=1024, radius=2):
             arr[hash(pair) % n_bits] = 1
     return arr.tolist()
 
+def _map4c_single(smiles_or_mol, n_bits=1024):
+    mol = _ensure_mol(smiles_or_mol)
+    try:
+        from mapchiral.mapchiral import encode
+    except ImportError:
+        raise ImportError(
+            "mapchiral is required for MAP4C fingerprint. "
+            "Install it with: pip install mapchiral"
+        )
+    hashes = encode(mol, max_radius=2, n_permutations=n_bits, mapping=False)
+    arr = np.zeros(n_bits, dtype=np.int32)
+    for h in hashes:
+        arr[int(h) % n_bits] = 1
+    return arr.tolist()
+
 def _multihash_fold(sparse_fp, n_bits, n_hashes=2):
     """Fold a sparse fingerprint using k independent hashes (Bloom filter approach).
 
@@ -701,6 +716,10 @@ def map4(input_data, *, n_bits=1024, column=None, n_jobs=1, sparse=False):
     """MAP4 (MinHashed Atom Pair) — hashed atom-pair substructures at radius 2."""
     return _versatile(_map4_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits)
 
+def map4c(input_data, *, n_bits=1024, column=None, n_jobs=1, sparse=False):
+    """MAP4C (MinHashed Atom Pair Chiral) — stereochemistry-aware MAP4. Requires: pip install mapchiral"""
+    return _versatile(_map4c_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits)
+
 def atompairs3d(input_data, *, n_bits=780, collision_free=False, column=None, n_jobs=1, sparse=False):
     """3D Atom Pairs fingerprint (780 bits). Use collision_free=True for multi-hash."""
     return _versatile(_atompairs3d_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits, collision_free=collision_free)
@@ -882,6 +901,7 @@ FINGERPRINTS = {
     "avalon": (_avalon_single, 1024, "Avalon"),
     "mhfp": (_mhfp_single, 1024, "MHFP (MinHashed Fingerprint)"),
     "map4": (_map4_single, 1024, "MAP4 (MinHashed Atom Pair r=2)"),
+    "map4c": (_map4c_single, 1024, "MAP4C (MinHashed Atom Pair Chiral)"),
     "atompairs3d": (_atompairs3d_single, 780, "3D Atom Pairs"),
     "atompairs3d_count": (_atompairs3d_count_single, 780, "3D Atom Pairs Count"),
     "usr": (_usr_single, 12, "Ultrafast Shape Recognition"),

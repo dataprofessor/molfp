@@ -63,6 +63,7 @@ from .fingerprints import (
     avalon,
     mhfp,
     map4,
+    map4c,
     atompairs3d,
     atompairs3d_count,
     usr,

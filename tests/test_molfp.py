@@ -35,7 +35,7 @@ class TestCoreFingerprints:
 
     def test_available_returns_30(self):
         fps = molfp.available()
-        assert len(fps) == 39
+        assert len(fps) == 40
 
     @pytest.mark.parametrize("fp_name,expected_len", [
         ("maccs", 166),
@@ -904,7 +904,7 @@ class TestSklearnTransformers:
     # ── TRANSFORMERS registry ────────────────────────────────────────────────
 
     def test_transformers_registry_has_all_22(self):
-        assert len(molfp.TRANSFORMERS) == 31
+        assert len(molfp.TRANSFORMERS) == 32
 
     def test_transformers_registry_matches_base_fingerprints(self):
         # Transformers cover the 22 non-graph fingerprints
