@@ -391,6 +391,14 @@ def _view3d_speck(input_data, *, size=(600, 400), spin=False, preset=None):
     w.layout.width = f"{size[0]}px"
     w.layout.height = f"{size[1]}px"
 
+    # Apply molfp defaults that make Speck visually distinct from py3Dmol
+    w.atomScale = 0.6
+    w.ao = 0.85
+    w.outline = 0.8
+    w.bondScale = 0.5
+    w.brightness = 0.4
+    w.bonds = True
+
     if preset:
         w.apply_preset(preset)
     if spin:
