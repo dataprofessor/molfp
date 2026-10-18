@@ -1,5 +1,45 @@
 # Changelog
 
+## v0.3.5 (2026-10-18)
+
+- Visualization split into standalone [molviewer](https://pypi.org/project/molviewer/) package
+- Removed `draw()`, `view3d()`, `draw_attribution()` from molfp
+- Removed py3Dmol and ipyspeck dependencies (lighter install)
+- Use `pip install molviewer` for 2D/3D visualization
+
+## v0.3.4 (2026-10-18)
+
+- Added houkmol Speck preset (matte, dark outlines, Houk group style)
+- Speck defaults to ball_and_stick when no preset specified
+- Graceful handling of unsupported ipyspeck presets
+- Suppressed RDKit kekulization warnings on import
+
+## v0.3.3 (2026-10-18)
+
+- Added ball_and_stick, toon, and licorice Speck presets
+- Exposed Speck parameters: atom_scale, bond_scale, ao, brightness, outline, bonds
+- Speck style in view3d() for ambient-occlusion 3D rendering
+- ipyspeck added as base dependency
+
+## v0.3.2 (2026-10-17)
+
+### New Fingerprint Types
+- FCFP4: Feature Morgan (pharmacophoric atom types), collision_free supported
+- Lingo: hashed SMILES 4-grams
+- Shortest Path: atom-pair features along shortest paths
+- Hybridization: RDKit path FP with hybridization invariants
+- Signature: atom-centered subgraph descriptors (Faulon signatures)
+- Total: 35 FP types (18 2D + 9 3D + 8 graph), 27 sklearn transformers
+
+### New Features
+- `draw_attribution()`: class-specific SHAP attribution maps (green=active, red=inactive)
+- Two attribution styles: highlight (solid circles) and contour (gaussian map)
+- CI test workflow (Python 3.9-3.12)
+- MkDocs Material documentation site
+- CITATION.cff for academic citations
+- Colab-compatible getting started notebook
+- 393 tests passing
+
 ## v0.3.1 (2026-10-13)
 
 - Fix PyPI page: images now display correctly (absolute URLs)
@@ -12,7 +52,7 @@
 ### New Fingerprint Types
 - 9 3D fingerprints: USR, USRCAT, Autocorr3D, RDF, MORSE, WHIM, GETAWAY, PEOE_VSA3D, SMR_VSA3D
 - 8 graph fingerprints: standard, distance, line, fragment (each with base and enriched variants)
-- Total: 35 fingerprint types (18 2D + 9 3D + 8 graph)
+- Total: 30 fingerprint types (13 2D + 9 3D + 8 graph)
 
 ### New Modules
 - **scaffold**: `scaffold()`, `scaffold_fingerprint()`, `scaffold_split()` — Murcko/generic scaffold extraction with ~130 named ring systems, scaffold-aware train/test splitting
