@@ -9,7 +9,6 @@
 
 ## v0.3.4 (2026-10-18)
 
-- Added houkmol Speck preset (matte, dark outlines, Houk group style)
 - Speck defaults to ball_and_stick when no preset specified
 - Graceful handling of unsupported ipyspeck presets
 - Suppressed RDKit kekulization warnings on import
