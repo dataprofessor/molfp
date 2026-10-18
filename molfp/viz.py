@@ -145,7 +145,7 @@ def _bit_shap_to_atom_weights(mol, smiles, fp_type, shap_per_bit):
 
 def draw_attribution(smiles, interpret_result, *, mode="dual",
                      class_active="active", class_inactive="inactive",
-                     size=(400, 400), alpha=0.5, save=None):
+                     size=(400, 400), alpha=0.5, style="highlight", save=None):
     """Draw 2D structure colored by class-specific SHAP attribution.
 
     Args:
@@ -156,6 +156,7 @@ def draw_attribution(smiles, interpret_result, *, mode="dual",
         class_inactive: name of the inactive class in interpret_result.
         size: (width, height) in pixels.
         alpha: transparency of the heatmap overlay.
+        style: "highlight" (solid atom/bond circles) or "contour" (gaussian contour map).
         save: file path to save the image (e.g. "attribution.png"). If None, image is not saved.
 
     Returns:
@@ -200,7 +201,28 @@ def draw_attribution(smiles, interpret_result, *, mode="dual",
     active_weights = _bit_shap_to_atom_weights(mol, smiles, fp_type, active_bit_shap)
     inactive_weights = _bit_shap_to_atom_weights(mol, smiles, fp_type, inactive_bit_shap)
 
-    def _render(weights, color_pos, color_neg):
+    # ── Contour style (SimilarityMaps gaussian) ──────────────────────────
+    def _render_contour(weights, cmap):
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from rdkit.Chem.Draw import SimilarityMaps
+        from PIL import Image as PILImage
+        from io import BytesIO
+
+        max_w = max(abs(weights.max()), abs(weights.min()), 1e-8)
+        normalized = list(weights / max_w)
+        fig = SimilarityMaps.GetSimilarityMapFromWeights(
+            mol, normalized, colorMap=cmap, alpha=alpha, size=size
+        )
+        buf = BytesIO()
+        fig.savefig(buf, format="png", bbox_inches="tight", dpi=150, facecolor="white")
+        plt.close(fig)
+        buf.seek(0)
+        return PILImage.open(buf).copy()
+
+    # ── Highlight style (solid atom/bond circles) ────────────────────────
+    def _render_highlight(weights, color_pos, color_neg):
         max_w = max(abs(weights.max()), abs(weights.min()), 1e-8)
         norm = weights / max_w
 
@@ -274,21 +296,37 @@ def draw_attribution(smiles, interpret_result, *, mode="dual",
     green = (0.13, 0.55, 0.13)
     red = (0.8, 0.1, 0.1)
 
-    if mode == "active":
-        img = _render(np.clip(active_weights, 0, None), green, green)
-    elif mode == "inactive":
-        # Inactive SHAP values are typically negative (pushes away from active),
-        # so we negate to get positive weights for atoms that drive inactivity
-        img = _render(np.clip(-inactive_weights, 0, None), red, red)
-    elif mode == "dual":
-        # Combine: positive = active-driving (green), negative = inactive-driving (red)
-        active_pos = np.clip(active_weights, 0, None)
-        inactive_pos = np.clip(-inactive_weights, 0, None)
-        # Merge into single weight vector: green where active dominates, red where inactive dominates
-        dual_weights = active_pos - inactive_pos
-        img = _render(dual_weights, green, red)
+    if style == "contour":
+        from matplotlib.colors import LinearSegmentedColormap
+        cmap_green = LinearSegmentedColormap.from_list("active", [(1, 1, 1), green])
+        cmap_red = LinearSegmentedColormap.from_list("inactive", [(1, 1, 1), red])
+        cmap_dual = LinearSegmentedColormap.from_list("dual", [red, (1, 1, 1), green])
+
+        if mode == "active":
+            img = _render_contour(np.clip(active_weights, 0, None), cmap_green)
+        elif mode == "inactive":
+            img = _render_contour(np.clip(-inactive_weights, 0, None), cmap_red)
+        elif mode == "dual":
+            active_pos = np.clip(active_weights, 0, None)
+            inactive_pos = np.clip(-inactive_weights, 0, None)
+            dual_weights = active_pos - inactive_pos
+            img = _render_contour(dual_weights, cmap_dual)
+        else:
+            raise ValueError(f"Unknown mode: {mode}. Use 'active', 'inactive', or 'dual'.")
+    elif style == "highlight":
+        if mode == "active":
+            img = _render_highlight(np.clip(active_weights, 0, None), green, green)
+        elif mode == "inactive":
+            img = _render_highlight(np.clip(-inactive_weights, 0, None), red, red)
+        elif mode == "dual":
+            active_pos = np.clip(active_weights, 0, None)
+            inactive_pos = np.clip(-inactive_weights, 0, None)
+            dual_weights = active_pos - inactive_pos
+            img = _render_highlight(dual_weights, green, red)
+        else:
+            raise ValueError(f"Unknown mode: {mode}. Use 'active', 'inactive', or 'dual'.")
     else:
-        raise ValueError(f"Unknown mode: {mode}. Use 'active', 'inactive', or 'dual'.")
+        raise ValueError(f"Unknown style: {style}. Use 'highlight' or 'contour'.")
 
     if save:
         img.save(save)
