@@ -314,7 +314,9 @@ def draw_attribution(smiles, interpret_result, *,
 # ── 3D Viewing ───────────────────────────────────────────────────────────────
 
 def view3d(input_data, *, style="stick", size=(600, 400), spin=False,
-           background="white", preset=None):
+           background="white", preset=None,
+           atom_scale=None, bond_scale=None, ao=None, brightness=None,
+           outline=None, bonds=None):
     """Interactive 3D molecular viewer.
 
     Auto-detects environment:
@@ -331,13 +333,22 @@ def view3d(input_data, *, style="stick", size=(600, 400), spin=False,
         background: background color (default "white", py3Dmol only).
         preset: Speck preset ("default", "matte", "glossy", "toon", "cover",
                 "metal", "glass", "goodsell"). Only used with style="speck".
+        atom_scale: Speck atom radius (0.0-1.0, default 0.24 for ball-and-stick).
+        bond_scale: Speck bond radius (0.0-1.0, default 0.5).
+        ao: Speck ambient occlusion strength (0.0-1.0, default 0.75).
+        brightness: Speck brightness (0.0-1.0, default 0.5).
+        outline: Speck depth-aware outline strength (0.0-1.0, default 0.0).
+        bonds: Speck show bonds (True/False, default True).
 
     Returns:
         In script mode: HTML string (py3Dmol) or Speck widget.
         In notebook/Streamlit: displays inline.
     """
     if style == "speck":
-        return _view3d_speck(input_data, size=size, spin=spin, preset=preset)
+        return _view3d_speck(input_data, size=size, spin=spin, preset=preset,
+                             atom_scale=atom_scale, bond_scale=bond_scale,
+                             ao=ao, brightness=brightness, outline=outline,
+                             bonds=bonds)
 
     try:
         import py3Dmol
@@ -373,7 +384,9 @@ def view3d(input_data, *, style="stick", size=(600, 400), spin=False,
         return _viewer_to_html(viewer, size)
 
 
-def _view3d_speck(input_data, *, size=(600, 400), spin=False, preset=None):
+def _view3d_speck(input_data, *, size=(600, 400), spin=False, preset=None,
+                  atom_scale=None, bond_scale=None, ao=None, brightness=None,
+                  outline=None, bonds=None):
     """Render molecule with the Speck ambient-occlusion renderer."""
     try:
         from ipyspeck import Speck
@@ -391,16 +404,23 @@ def _view3d_speck(input_data, *, size=(600, 400), spin=False, preset=None):
     w.layout.width = f"{size[0]}px"
     w.layout.height = f"{size[1]}px"
 
-    # Apply molfp defaults that make Speck visually distinct from py3Dmol
-    w.atomScale = 0.6
-    w.ao = 0.85
-    w.outline = 0.8
-    w.bondScale = 0.5
-    w.brightness = 0.4
-    w.bonds = True
-
+    # Apply preset first (if any), then user overrides
     if preset:
         w.apply_preset(preset)
+
+    # Apply user-specified parameters (override preset/defaults)
+    if atom_scale is not None:
+        w.atomScale = atom_scale
+    if bond_scale is not None:
+        w.bondScale = bond_scale
+    if ao is not None:
+        w.ao = ao
+    if brightness is not None:
+        w.brightness = brightness
+    if outline is not None:
+        w.outline = outline
+    if bonds is not None:
+        w.bonds = bonds
     if spin:
         w.autoRotate = True
 
