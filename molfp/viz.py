@@ -332,7 +332,8 @@ def view3d(input_data, *, style="stick", size=(600, 400), spin=False,
         spin: if True, auto-rotate the molecule (py3Dmol only; speck uses autoRotate).
         background: background color (default "white", py3Dmol only).
         preset: Speck preset. molfp presets: "ball_and_stick" (default look),
-                "toon" (flat shading + outlines), "licorice" (stick model).
+                "toon" (flat shading + outlines), "licorice" (stick model),
+                "houkmol" (matte + outlines, Houk group style approximation).
                 ipyspeck presets: "default", "matte", "glossy", "cover",
                 "metal", "glass", "goodsell".
         atom_scale: Speck atom radius (0.0-1.0, default 0.24 for ball-and-stick).
@@ -425,6 +426,15 @@ def _view3d_speck(input_data, *, size=(600, 400), spin=False, preset=None,
             "bonds": True, "bondScale": 1.0, "bondShade": 0.5,
             "ao": 0.75, "brightness": 0.5, "outline": 0.0,
             "dofStrength": 0.0,
+        },
+        "houkmol": {
+            "atomScale": 0.24, "relativeAtomScale": 0.64, "atomShade": 0.3,
+            "bonds": True, "bondScale": 0.5, "bondShade": 0.3,
+            "ao": 0.8, "brightness": 0.45, "outline": 1.0,
+            "outlineColor": "#000000", "outlineWidth": 1.5,
+            "gloss": 0.0, "metallic": 0.0, "specular": 0.0,
+            "saturation": 0.3, "dofStrength": 0.0, "fog": 0.0,
+            "fxaa": 1, "shadows": 0.0,
         },
     }
 
