@@ -223,81 +223,108 @@ def draw_attribution(smiles, interpret_result, *,
         buf.seek(0)
         return PILImage.open(buf).copy()
 
-    # ── Highlight style (smooth gaussian blend) ────────────────────────────
+    # ── Highlight style (atom/bond circles with blended colors) ────────────
     def _render_highlight(weights, color_pos, color_neg):
         from rdkit.Chem.Draw import rdMolDraw2D
-        from PIL import Image as PILImage, ImageFilter, ImageDraw
+        from PIL import Image as PILImage, ImageFilter
         from io import BytesIO
 
         max_w = max(abs(weights.max()), abs(weights.min()), 1e-8)
         norm = weights / max_w
 
-        # Draw plain molecule and get pixel coordinates
+        def _color_for_weight(w, color_pos, color_neg):
+            if abs(w) < 0.05:
+                return None
+            color = color_pos if w > 0 else color_neg
+            intensity = min(abs(w), 1.0)
+            r = color[0] + (1 - color[0]) * (1 - intensity)
+            g = color[1] + (1 - color[1]) * (1 - intensity)
+            b = color[2] + (1 - color[2]) * (1 - intensity)
+            return (r, g, b)
+
+        highlight_atoms = []
+        highlight_colors = {}
+        for i, w in enumerate(norm):
+            c = _color_for_weight(w, color_pos, color_neg)
+            if c is not None:
+                highlight_atoms.append(i)
+                highlight_colors[i] = c
+
+        # Color bonds — blend between the two atom colors
+        highlight_bonds = []
+        highlight_bond_colors = {}
+        highlight_atom_set = set(highlight_atoms)
+        for bond in mol.GetBonds():
+            a1 = bond.GetBeginAtomIdx()
+            a2 = bond.GetEndAtomIdx()
+            if a1 in highlight_atom_set or a2 in highlight_atom_set:
+                bond_idx = bond.GetIdx()
+                highlight_bonds.append(bond_idx)
+                w1 = norm[a1] if a1 < len(norm) else 0
+                w2 = norm[a2] if a2 < len(norm) else 0
+                avg_w = (w1 + w2) / 2
+                c = _color_for_weight(avg_w, color_pos, color_neg)
+                if c is None:
+                    c = (0.95, 0.95, 0.95)
+                highlight_bond_colors[bond_idx] = c
+
+        # Draw with highlights
         try:
             drawer = rdMolDraw2D.MolDraw2DCairo(size[0], size[1])
         except Exception:
             drawer = rdMolDraw2D.MolDraw2DSVG(size[0], size[1])
-        drawer.drawOptions().clearBackground = True
-        drawer.DrawMolecule(mol)
+        opts = drawer.drawOptions()
+        opts.clearBackground = True
+
+        highlight_radii = {i: 0.4 for i in highlight_atoms}
+        drawer.DrawMolecule(
+            mol,
+            highlightAtoms=highlight_atoms,
+            highlightAtomColors=highlight_colors,
+            highlightAtomRadii=highlight_radii,
+            highlightBonds=highlight_bonds,
+            highlightBondColors=highlight_bond_colors,
+        )
         drawer.FinishDrawing()
-
-        # Get pixel coordinates from the drawer
-        atom_coords = []
-        for i in range(mol.GetNumAtoms()):
-            pt = drawer.GetDrawCoords(i)
-            atom_coords.append((int(pt.x), int(pt.y)))
-
         png = drawer.GetDrawingText()
-        mol_img = PILImage.open(BytesIO(png)).convert("RGBA").copy()
+        raw_img = PILImage.open(BytesIO(png)).convert("RGBA").copy()
 
-        # Make white background transparent so heatmap shows through
-        data = mol_img.getdata()
+        # Light gaussian blur on the highlight regions only (not molecule lines)
+        # Extract just the colored highlight areas, blur them, then re-composite
+        from PIL import Image as PILImage2
+        
+        # Re-draw molecule without highlights for clean lines
+        try:
+            drawer2 = rdMolDraw2D.MolDraw2DCairo(size[0], size[1])
+        except Exception:
+            drawer2 = rdMolDraw2D.MolDraw2DSVG(size[0], size[1])
+        drawer2.drawOptions().clearBackground = True
+        drawer2.DrawMolecule(mol)
+        drawer2.FinishDrawing()
+        clean_png = drawer2.GetDrawingText()
+        clean_img = PILImage.open(BytesIO(clean_png)).convert("RGBA").copy()
+
+        # Get highlight-only layer: difference between highlighted and clean
+        # Simpler: blur the highlighted image, then paste clean molecule on top
+        blur_r = max(int(size[0] * 0.008), 1)
+        r, g, b, a = raw_img.split()
+        r = r.filter(ImageFilter.GaussianBlur(blur_r))
+        g = g.filter(ImageFilter.GaussianBlur(blur_r))
+        b = b.filter(ImageFilter.GaussianBlur(blur_r))
+        blurred_bg = PILImage.merge("RGBA", (r, g, b, a))
+
+        # Make clean molecule background transparent
+        clean_data = clean_img.getdata()
         new_data = []
-        for item in data:
-            if item[0] > 240 and item[1] > 240 and item[2] > 240:
+        for item in clean_data:
+            if item[0] > 245 and item[1] > 245 and item[2] > 245:
                 new_data.append((255, 255, 255, 0))
             else:
                 new_data.append(item)
-        mol_img.putdata(new_data)
+        clean_img.putdata(new_data)
 
-        # Paint gaussian blobs at each atom's pixel position
-        heatmap = PILImage.new("RGBA", (size[0], size[1]), (255, 255, 255, 0))
-        radius = int(size[0] * 0.10)
-
-        for i, w in enumerate(norm):
-            if abs(w) < 0.05:
-                continue
-            px, py = atom_coords[i]
-            color = color_pos if w > 0 else color_neg
-            intensity = min(abs(w), 1.0)
-            r_val = int(color[0] * 255)
-            g_val = int(color[1] * 255)
-            b_val = int(color[2] * 255)
-            a_val = int(intensity * 255)
-
-            blob = PILImage.new("RGBA", (size[0], size[1]), (0, 0, 0, 0))
-            draw_ctx = ImageDraw.Draw(blob)
-            draw_ctx.ellipse(
-                [px - radius, py - radius, px + radius, py + radius],
-                fill=(r_val, g_val, b_val, a_val)
-            )
-            heatmap = PILImage.alpha_composite(heatmap, blob)
-
-        # Blur for smooth blending
-        blur_radius = int(size[0] * 0.05)
-        r, g, b, a = heatmap.split()
-        r = r.filter(ImageFilter.GaussianBlur(blur_radius))
-        g = g.filter(ImageFilter.GaussianBlur(blur_radius))
-        b = b.filter(ImageFilter.GaussianBlur(blur_radius))
-        a = a.filter(ImageFilter.GaussianBlur(blur_radius))
-        heatmap = PILImage.merge("RGBA", (r, g, b, a))
-
-        # Composite: white bg → heatmap → molecule
-        result = PILImage.alpha_composite(
-            PILImage.new("RGBA", size, (255, 255, 255, 255)),
-            heatmap
-        )
-        result = PILImage.alpha_composite(result, mol_img)
+        # Composite: blurred highlights + sharp molecule lines
+        result = PILImage.alpha_composite(blurred_bg, clean_img)
         return result.convert("RGB")
 
     green = (0.13, 0.55, 0.13)
