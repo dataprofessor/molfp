@@ -222,6 +222,31 @@ def draw_attribution(smiles, interpret_result, *, mode="dual",
                 b = color_neg[2] + (1 - color_neg[2]) * (1 - intensity)
             highlight_colors[i] = (r, g, b)
 
+        # Color bonds by averaging the weights of their two atoms
+        highlight_bonds = []
+        highlight_bond_colors = {}
+        highlight_atom_set = set(highlight_atoms)
+        for bond in mol.GetBonds():
+            a1 = bond.GetBeginAtomIdx()
+            a2 = bond.GetEndAtomIdx()
+            if a1 in highlight_atom_set or a2 in highlight_atom_set:
+                bond_idx = bond.GetIdx()
+                highlight_bonds.append(bond_idx)
+                w1 = norm[a1] if a1 < len(norm) else 0
+                w2 = norm[a2] if a2 < len(norm) else 0
+                avg_w = (w1 + w2) / 2
+                if avg_w > 0:
+                    intensity = min(abs(avg_w), 1.0)
+                    br = color_pos[0] + (1 - color_pos[0]) * (1 - intensity)
+                    bg = color_pos[1] + (1 - color_pos[1]) * (1 - intensity)
+                    bb = color_pos[2] + (1 - color_pos[2]) * (1 - intensity)
+                else:
+                    intensity = min(abs(avg_w), 1.0)
+                    br = color_neg[0] + (1 - color_neg[0]) * (1 - intensity)
+                    bg = color_neg[1] + (1 - color_neg[1]) * (1 - intensity)
+                    bb = color_neg[2] + (1 - color_neg[2]) * (1 - intensity)
+                highlight_bond_colors[bond_idx] = (br, bg, bb)
+
         from rdkit.Chem.Draw import rdMolDraw2D
         try:
             drawer = rdMolDraw2D.MolDraw2DCairo(size[0], size[1])
@@ -237,7 +262,8 @@ def draw_attribution(smiles, interpret_result, *, mode="dual",
             highlightAtoms=highlight_atoms,
             highlightAtomColors=highlight_colors,
             highlightAtomRadii=highlight_radii,
-            highlightBonds=[],
+            highlightBonds=highlight_bonds,
+            highlightBondColors=highlight_bond_colors,
         )
         drawer.FinishDrawing()
         png = drawer.GetDrawingText()
