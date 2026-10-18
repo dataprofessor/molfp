@@ -143,15 +143,17 @@ def _bit_shap_to_atom_weights(mol, smiles, fp_type, shap_per_bit):
     return weights
 
 
-def draw_attribution(smiles, interpret_result, *, mode="dual",
+def draw_attribution(smiles, interpret_result, *,
                      class_active="active", class_inactive="inactive",
                      size=(400, 400), alpha=0.5, style="highlight", save=None):
     """Draw 2D structure colored by class-specific SHAP attribution.
 
+    Green regions drive the active prediction, red regions drive inactive.
+    Intensity is proportional to SHAP magnitude. Neutral atoms are uncolored.
+
     Args:
         smiles: SMILES string of the molecule to visualize.
         interpret_result: dict returned by molfp.interpret().
-        mode: "active" (green), "inactive" (red), or "dual" (green + red).
         class_active: name of the active class in interpret_result.
         class_inactive: name of the inactive class in interpret_result.
         size: (width, height) in pixels.
@@ -276,9 +278,9 @@ def draw_attribution(smiles, interpret_result, *, mode="dual",
             drawer = rdMolDraw2D.MolDraw2DSVG(size[0], size[1])
         opts = drawer.drawOptions()
         opts.clearBackground = True
-        opts.highlightRadius = 0.5
+        opts.highlightRadius = 0.3
 
-        highlight_radii = {i: 0.5 for i in highlight_atoms}
+        highlight_radii = {i: 0.3 for i in highlight_atoms}
         drawer.DrawMolecule(
             mol,
             highlightAtoms=highlight_atoms,
@@ -296,35 +298,16 @@ def draw_attribution(smiles, interpret_result, *, mode="dual",
     green = (0.13, 0.55, 0.13)
     red = (0.8, 0.1, 0.1)
 
+    active_pos = np.clip(active_weights, 0, None)
+    inactive_pos = np.clip(-inactive_weights, 0, None)
+    dual_weights = active_pos - inactive_pos
+
     if style == "contour":
         from matplotlib.colors import LinearSegmentedColormap
-        cmap_green = LinearSegmentedColormap.from_list("active", [(1, 1, 1), green])
-        cmap_red = LinearSegmentedColormap.from_list("inactive", [(1, 1, 1), red])
         cmap_dual = LinearSegmentedColormap.from_list("dual", [red, (1, 1, 1), green])
-
-        if mode == "active":
-            img = _render_contour(np.clip(active_weights, 0, None), cmap_green)
-        elif mode == "inactive":
-            img = _render_contour(np.clip(-inactive_weights, 0, None), cmap_red)
-        elif mode == "dual":
-            active_pos = np.clip(active_weights, 0, None)
-            inactive_pos = np.clip(-inactive_weights, 0, None)
-            dual_weights = active_pos - inactive_pos
-            img = _render_contour(dual_weights, cmap_dual)
-        else:
-            raise ValueError(f"Unknown mode: {mode}. Use 'active', 'inactive', or 'dual'.")
+        img = _render_contour(dual_weights, cmap_dual)
     elif style == "highlight":
-        if mode == "active":
-            img = _render_highlight(np.clip(active_weights, 0, None), green, green)
-        elif mode == "inactive":
-            img = _render_highlight(np.clip(-inactive_weights, 0, None), red, red)
-        elif mode == "dual":
-            active_pos = np.clip(active_weights, 0, None)
-            inactive_pos = np.clip(-inactive_weights, 0, None)
-            dual_weights = active_pos - inactive_pos
-            img = _render_highlight(dual_weights, green, red)
-        else:
-            raise ValueError(f"Unknown mode: {mode}. Use 'active', 'inactive', or 'dual'.")
+        img = _render_highlight(dual_weights, green, red)
     else:
         raise ValueError(f"Unknown style: {style}. Use 'highlight' or 'contour'.")
 
