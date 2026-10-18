@@ -12,7 +12,7 @@ from typing import Union
 from collections import defaultdict
 
 import numpy as np
-from rdkit import Chem
+from rdkit import Chem, RDLogger
 from rdkit.Chem.Scaffolds import MurckoScaffold
 
 from .fingerprints import _ensure_mol, _extract_smiles
@@ -152,11 +152,13 @@ _NAMED_SCAFFOLDS = {
 
 # Build a canonical lookup: re-canonicalize all keys for consistent matching
 _SCAFFOLD_NAME_LOOKUP = {}
+RDLogger.DisableLog('rdApp.*')
 for smi, name in _NAMED_SCAFFOLDS.items():
     mol = Chem.MolFromSmiles(smi)
     if mol:
         can = Chem.MolToSmiles(mol)
         _SCAFFOLD_NAME_LOOKUP[can] = name
+RDLogger.EnableLog('rdApp.*')
 
 
 def _name_scaffold(scaffold_smiles):
