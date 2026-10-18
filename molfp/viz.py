@@ -208,20 +208,26 @@ def draw_attribution(smiles, interpret_result, *,
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
-        from rdkit.Chem.Draw import SimilarityMaps
+        from rdkit.Chem.Draw import SimilarityMaps, rdMolDraw2D
         from PIL import Image as PILImage
         from io import BytesIO
 
         max_w = max(abs(weights.max()), abs(weights.min()), 1e-8)
         normalized = list(weights / max_w)
-        fig = SimilarityMaps.GetSimilarityMapFromWeights(
-            mol, normalized, colorMap=cmap, alpha=alpha, size=size
+
+        try:
+            d2d = rdMolDraw2D.MolDraw2DCairo(size[0], size[1])
+        except Exception:
+            d2d = rdMolDraw2D.MolDraw2DSVG(size[0], size[1])
+        d2d.drawOptions().bondLineWidth = 2.0
+
+        result_d2d = SimilarityMaps.GetSimilarityMapFromWeights(
+            mol, normalized, colorMap=cmap, alpha=alpha, size=size,
+            draw2d=d2d, contourLines=10
         )
-        buf = BytesIO()
-        fig.savefig(buf, format="png", bbox_inches="tight", dpi=150, facecolor="white")
-        plt.close(fig)
-        buf.seek(0)
-        return PILImage.open(buf).copy()
+        result_d2d.FinishDrawing()
+        png = result_d2d.GetDrawingText()
+        return PILImage.open(BytesIO(png)).copy()
 
     # ── Highlight style (solid atom/bond circles) ──────────────────────────
     def _render_highlight(weights, color_pos, color_neg):
