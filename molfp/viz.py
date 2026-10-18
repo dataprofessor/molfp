@@ -314,26 +314,31 @@ def draw_attribution(smiles, interpret_result, *,
 # ── 3D Viewing ───────────────────────────────────────────────────────────────
 
 def view3d(input_data, *, style="stick", size=(600, 400), spin=False,
-           background="white"):
+           background="white", preset=None):
     """Interactive 3D molecular viewer.
 
     Auto-detects environment:
       - Jupyter/Colab: renders inline interactive widget
       - Streamlit: renders via st.components.v1.html()
-      - Script: returns HTML string
-
-    Requires: pip install py3Dmol
+      - Script: returns HTML string (py3Dmol) or widget (speck)
 
     Args:
         input_data: SMILES string or RDKit Mol.
-        style: "stick", "sphere", "line", or "cartoon".
+        style: py3Dmol styles ("stick", "sphere", "line", "cartoon", "ball_and_stick")
+               or "speck" for the Speck ambient-occlusion renderer.
         size: (width, height) in pixels.
-        spin: if True, auto-rotate the molecule.
-        background: background color (default "white").
+        spin: if True, auto-rotate the molecule (py3Dmol only; speck uses autoRotate).
+        background: background color (default "white", py3Dmol only).
+        preset: Speck preset ("default", "matte", "glossy", "toon", "cover",
+                "metal", "glass", "goodsell"). Only used with style="speck".
 
     Returns:
-        In script mode: HTML string. In notebook/Streamlit: displays inline.
+        In script mode: HTML string (py3Dmol) or Speck widget.
+        In notebook/Streamlit: displays inline.
     """
+    if style == "speck":
+        return _view3d_speck(input_data, size=size, spin=spin, preset=preset)
+
     try:
         import py3Dmol
     except ImportError:
@@ -366,6 +371,45 @@ def view3d(input_data, *, style="stick", size=(600, 400), spin=False,
         components.html(html, height=size[1] + 20, width=size[0] + 20)
     else:
         return _viewer_to_html(viewer, size)
+
+
+def _view3d_speck(input_data, *, size=(600, 400), spin=False, preset=None):
+    """Render molecule with the Speck ambient-occlusion renderer."""
+    try:
+        from ipyspeck import Speck
+    except ImportError:
+        raise ImportError(
+            "ipyspeck is required for style='speck'. "
+            "Install it with: pip install ipyspeck"
+        )
+
+    mol = _ensure_mol(input_data)
+    mol = Chem.AddHs(mol)
+    mol = _ensure_conformer(mol)
+
+    w = Speck.from_rdkit(mol)
+    w.layout.width = f"{size[0]}px"
+    w.layout.height = f"{size[1]}px"
+
+    if preset:
+        w.apply_preset(preset)
+    if spin:
+        w.autoRotate = True
+
+    env = _detect_env()
+    if env == "streamlit":
+        try:
+            import stspeck
+            mol_block = Chem.MolToMolBlock(mol)
+            kwargs = {"data": mol_block}
+            if preset:
+                kwargs["preset"] = preset
+            stspeck.speck(**kwargs, height=size[1])
+            return
+        except ImportError:
+            pass
+
+    return w
 
 
 def _build_style(style):
