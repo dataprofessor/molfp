@@ -49,6 +49,16 @@ dependencies = [
 dev = [
     "pytest>=7.0",
 ]
+speck = [
+    "ipyspeck>=0.8",
+]
+streamlit = [
+    "stspeck>=0.8",
+]
+all = [
+    "ipyspeck>=0.8",
+    "stspeck>=0.8",
+]
 
 [project.urls]
 Homepage = "https://github.com/dataprofessor/molfp"
