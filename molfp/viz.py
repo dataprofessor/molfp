@@ -428,13 +428,16 @@ def _view3d_speck(input_data, *, size=(600, 400), spin=False, preset=None,
         },
     }
 
-    # Apply preset
-    if preset:
-        if preset in _MOLFP_PRESETS:
-            for key, value in _MOLFP_PRESETS[preset].items():
-                setattr(w, key, value)
-        else:
-            w.apply_preset(preset)
+    # Apply preset (default to ball_and_stick if none specified)
+    active_preset = preset if preset else "ball_and_stick"
+    if active_preset in _MOLFP_PRESETS:
+        for key, value in _MOLFP_PRESETS[active_preset].items():
+            setattr(w, key, value)
+    else:
+        try:
+            w.apply_preset(active_preset)
+        except (ValueError, Exception):
+            pass
 
     # Apply user-specified parameters (override preset/defaults)
     if atom_scale is not None:
