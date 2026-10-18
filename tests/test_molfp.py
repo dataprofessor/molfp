@@ -1505,75 +1505,8 @@ class Test3DFingerprints:
 # 19. Visualization (viz module)
 # =============================================================================
 
-class TestVisualization:
-    """Tests for draw() and view3d()."""
-
-    def test_draw_single_returns_image(self):
-        img = molfp.draw("CCO")
-        from PIL import Image
-        assert isinstance(img, Image.Image)
-
-    def test_draw_single_custom_size(self):
-        img = molfp.draw("CCO", size=(400, 400))
-        assert img.size[0] == 400
-        assert img.size[1] == 400
-
-    def test_draw_batch_returns_image(self):
-        img = molfp.draw(["CCO", "c1ccccc1", "CC(=O)O"])
-        from PIL import Image
-        assert isinstance(img, Image.Image)
-
-    def test_draw_batch_with_legends(self):
-        img = molfp.draw(
-            ["CCO", "c1ccccc1"],
-            legends=["ethanol", "benzene"]
-        )
-        from PIL import Image
-        assert isinstance(img, Image.Image)
-
-    def test_draw_with_highlight_bits(self):
-        img = molfp.draw("c1ccccc1", highlight_bits=[0, 1], fp_type="maccs")
-        from PIL import Image
-        assert isinstance(img, Image.Image)
-
-    def test_draw_rdkit_mol_input(self):
-        from rdkit import Chem
-        mol = Chem.MolFromSmiles("CCO")
-        img = molfp.draw(mol)
-        from PIL import Image
-        assert isinstance(img, Image.Image)
-
-    def test_view3d_returns_html_in_script_mode(self):
-        try:
-            import py3Dmol
-        except ImportError:
-            pytest.skip("py3Dmol not installed")
-        result = molfp.view3d("CCO")
-        assert isinstance(result, str)
-        assert "3Dmol" in result or "viewer" in result.lower() or "<div" in result
-
-    def test_view3d_different_styles(self):
-        try:
-            import py3Dmol
-        except ImportError:
-            pytest.skip("py3Dmol not installed")
-        for style in ["stick", "sphere", "line", "ball_and_stick"]:
-            result = molfp.view3d("CCO", style=style)
-            assert isinstance(result, str)
-
-    def test_view3d_missing_py3dmol_error(self):
-        """view3d raises ImportError with install instructions if py3Dmol missing."""
-        try:
-            import py3Dmol
-            # py3Dmol is available — just verify view3d works
-            result = molfp.view3d("CCO")
-            assert result is not None
-        except ModuleNotFoundError:
-            # py3Dmol not installed — verify our error message
-            with pytest.raises(ImportError, match="pip install py3Dmol"):
-                molfp.view3d("CCO")
-
-
+# =============================================================================
+# 20. Graph representations for deep learning
 # =============================================================================
 # 20. Graph representations for deep learning
 # =============================================================================

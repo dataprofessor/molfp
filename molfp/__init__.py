@@ -13,9 +13,9 @@ molfp — Interpretable molecular fingerprints with SHAP-driven chemical explana
   - graph: molecular graph representations for GNNs (4 types x 2 variants)
   - selection: feature selection (variance filter, mutual information)
   - scaffold: scaffold extraction, fingerprinting, and scaffold-aware splitting
-  - viz: 2D drawing and 3D interactive viewer
+  - viz: use molviewer package for 2D drawing, 3D viewing, and attribution maps
   - standardize: desalt, neutralize, canonicalize, deduplicate
-  - sklearn: 22 transformers + GraphTransformer for pipelines
+  - sklearn: 27 transformers + GraphTransformer for pipelines
 
 Usage:
     import molfp
@@ -36,7 +36,7 @@ Usage:
     result = molfp.interpret(smiles, activities, fp_type="ecfp4", collision_aware=True)
 """
 
-__version__ = "0.3.4"
+__version__ = "0.3.5"
 
 # ── Core fingerprint functions ────────────────────────────────────────────────
 from .fingerprints import (
@@ -129,7 +129,6 @@ from .distance import (
     tanimoto, dice, cosine, sokal_michener, russel_rao,
     distance, pairwise, pairwise_distance, available_metrics,
 )
-from .viz import draw, view3d, draw_attribution
 from .graph import (
     mol_graph, to_pyg, to_dgl, graphs_to_pyg,
     atom_feature_names, edge_feature_names,

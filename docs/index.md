@@ -55,36 +55,9 @@ result = molfp.scaffold_split(smiles, test_size=0.2)
 - **Bioactivity profiling** — enriched/depleted bit analysis
 - **Isomer discrimination** — test whether fingerprints distinguish structural isomers
 - **Graph representations** — 4 graph types with PyG/DGL converters
-- **sklearn compatible** — 22 transformers + GraphTransformer
-- **Visualization** — 2D drawing with bit highlighting, 3D interactive viewer
+- **sklearn compatible** — 27 transformers + GraphTransformer
 
-## Visualization
-
-<table>
-<tr>
-<td align="center"><img src="https://raw.githubusercontent.com/dataprofessor/molfp/main/assets/draw_2d_grid.png" alt="2D molecule grid" width="500"></td>
-<td align="center"><img src="https://raw.githubusercontent.com/dataprofessor/molfp/main/assets/draw_2d_highlight.png" alt="2D with fingerprint bit highlighting" width="220"></td>
-</tr>
-<tr>
-<td align="center"><em>Molecule grid with labels</em></td>
-<td align="center"><em>Fingerprint bit highlighting</em></td>
-</tr>
-</table>
-
-```python
-molfp.draw(smiles, legends=["Aspirin", "Caffeine"])
-molfp.draw("CC(=O)Oc1ccccc1C(=O)O", highlight_bits=[88, 143, 162], fp_type="maccs")
-```
-
-### 3D Interactive Viewer
-
-```python
-molfp.view3d("CN1C=NC2=C1C(=O)N(C(=O)N2C)C", style="ball_and_stick", spin=True)
-```
-
-<p align="center">
-<img src="https://raw.githubusercontent.com/dataprofessor/molfp/main/assets/view3d_notebook.png" alt="3D interactive viewer" width="600">
-</p>
+For molecule visualization (2D drawing, 3D viewing, attribution maps), see [molviewer](https://github.com/dataprofessor/molviewer): `pip install molviewer`
 
 ## 35 Fingerprint Types
 

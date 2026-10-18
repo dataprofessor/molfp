@@ -10,7 +10,7 @@ import molfp
 
 A cheminformatics project typically starts with computing molecular fingerprints, then moves through understanding what the bits mean, validating data quality, analyzing structure-activity relationships, and finally preparing features for machine learning. The diagram below shows how molfp's modules connect across these stages.
 
-Each module handles one step — from [Fingerprints](#compute) through [Explain & Annotate](#understand), [Collisions](#validate), [Bioactivity](#analyze), [Isomers](#analyze), [Fusion](#combine), and [Graph](#represent) representations, all the way to [sklearn](#model) transformers ready for pipelines. [Visualization and Standardize](#utilities) support the workflow at any stage.
+Each module handles one step — from [Fingerprints](#compute) through [Explain & Annotate](#understand), [Collisions](#validate), [Bioactivity](#analyze), [Isomers](#analyze), [Fusion](#combine), and [Graph](#represent) representations, all the way to [sklearn](#model) transformers ready for pipelines. [Standardize](#utilities) supports the workflow at any stage. For visualization, see [molviewer](https://github.com/dataprofessor/molviewer).
 
 ```mermaid
 graph TD
@@ -200,15 +200,6 @@ pipe = make_pipeline(molfp.ECFPTransformer(), RandomForestClassifier())
 ---
 
 ## Utilities
-
-### [Visualization](viz.md)
-
-2D molecule grids with fingerprint bit highlighting, and interactive 3D viewer with multiple styles.
-
-```python
-molfp.draw(smiles, highlight_bits=[88, 143], fp_type="maccs")
-molfp.view3d("CCO", style="ball_and_stick")
-```
 
 ### [Standardize](standardize.md)
 

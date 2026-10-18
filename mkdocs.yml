@@ -49,7 +49,6 @@ nav:
     - Scaffold: api/scaffold.md
     - Graph: api/graph.md
     - Feature Selection: api/selection.md
-    - Visualization: api/viz.md
     - Standardize: api/standardize.md
     - sklearn: api/sklearn.md
   - Changelog: changelog.md

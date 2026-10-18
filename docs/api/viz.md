@@ -1,3 +1,0 @@
-# Visualization
-
-::: molfp.viz

@@ -15,81 +15,9 @@
 
 **Interpretable molecular fingerprints with SHAP-driven chemical explanations.**
 
-A native Python/RDKit library that computes 35 molecular fingerprint types (18 2D + 9 3D + 8 graph-based) and provides built-in tools for interpretation, visualization, collision detection, activity cliff analysis, bioactivity profiling, and SHAP-based feature explanation — capabilities not found in any other fingerprint library.
+A native Python/RDKit library that computes 35 molecular fingerprint types (18 2D + 9 3D + 8 graph-based) and provides built-in tools for interpretation, collision detection, activity cliff analysis, bioactivity profiling, and SHAP-based feature explanation.
 
-## Install
-
-```bash
-pip install molfp
-```
-
-## Quick Start
-
-```python
-import molfp
-
-# Compute fingerprints — versatile input (str, list, Series, DataFrame)
-fp = molfp.maccs("CCO")                        # single → list of 166 ints
-fps = molfp.ecfp4(["CCO", "c1ccccc1"])         # batch → numpy (2, 1024)
-fps = molfp.ecfp4(df, n_bits=2048, n_jobs=-1)  # DataFrame with auto-detected SMILES column
-
-# All 30 types
-molfp.available()
-# ['maccs', 'ecfp4', 'pubchem', 'substructure', 'substructure_count',
-#  'klekota_roth', 'klekota_roth_count', 'estate', 'atompairs2d',
-#  'atompairs2d_count', 'rdk', 'rdk_ext', 'rdk_graphonly',
-#  'atompairs3d', 'atompairs3d_count', 'usr', 'usrcat',
-#  'autocorr3d', 'rdf', 'morse', 'whim', 'getaway',
-#  'graph_standard', 'graph_distance', 'graph_line', 'graph_fragment',
-#  'graph_standard_enriched', 'graph_distance_enriched',
-#  'graph_line_enriched', 'graph_fragment_enriched']
-```
-
-## Molecule Visualization
-
-### 2D Structure Drawing
-
-Draw molecules with optional fingerprint bit highlighting. Works in Jupyter, Colab, and Streamlit.
-
-```python
-# Single molecule
-molfp.draw("CC(=O)Oc1ccccc1C(=O)O")
-
-# Grid of molecules
-molfp.draw(smiles_list, legends=["Aspirin", "Caffeine", ...], mols_per_row=3)
-
-# Highlight atoms that trigger specific fingerprint bits
-molfp.draw("CC(=O)Oc1ccccc1C(=O)O", highlight_bits=[88, 143, 162], fp_type="maccs")
-```
-
-<table>
-<tr>
-<td align="center"><img src="https://raw.githubusercontent.com/dataprofessor/molfp/main/assets/draw_2d_grid.png" alt="2D molecule grid" width="500"></td>
-<td align="center"><img src="https://raw.githubusercontent.com/dataprofessor/molfp/main/assets/draw_2d_highlight.png" alt="2D with fingerprint bit highlighting" width="220"></td>
-</tr>
-<tr>
-<td align="center"><em>Molecule grid with labels</em></td>
-<td align="center"><em>Fingerprint bit highlighting</em></td>
-</tr>
-</table>
-
-### 3D Interactive Viewer
-
-Interactive 3D viewer using py3Dmol. Auto-detects environment (Jupyter, Colab, Streamlit).
-
-```python
-# Interactive 3D viewer
-molfp.view3d("CN1C=NC2=C1C(=O)N(C(=O)N2C)C")
-
-# Different styles: stick, sphere, line, ball_and_stick
-molfp.view3d("CC(=O)Oc1ccccc1C(=O)O", style="ball_and_stick", spin=True)
-```
-
-Uses adaptive conformer optimization (MMFF94) to generate optimized 3D structures automatically.
-
-<p align="center">
-<img src="https://raw.githubusercontent.com/dataprofessor/molfp/main/assets/view3d_notebook.png" alt="3D interactive viewer in Jupyter notebook" width="600">
-</p>
+For molecule visualization (2D drawing, 3D viewing, attribution maps), see [molviewer](https://github.com/dataprofessor/molviewer): `pip install molviewer`
 
 ## Features
 
