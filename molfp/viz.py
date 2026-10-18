@@ -223,77 +223,82 @@ def draw_attribution(smiles, interpret_result, *,
         buf.seek(0)
         return PILImage.open(buf).copy()
 
-    # ── Highlight style (solid atom/bond circles) ────────────────────────
+    # ── Highlight style (smooth gaussian blend) ────────────────────────────
     def _render_highlight(weights, color_pos, color_neg):
+        from rdkit.Chem.Draw import rdMolDraw2D
+        from PIL import Image as PILImage, ImageFilter, ImageDraw
+        from io import BytesIO
+
         max_w = max(abs(weights.max()), abs(weights.min()), 1e-8)
         norm = weights / max_w
 
-        highlight_atoms = []
-        highlight_colors = {}
-        for i, w in enumerate(norm):
-            if abs(w) < 0.05:
-                continue
-            highlight_atoms.append(i)
-            if w > 0:
-                intensity = min(abs(w), 1.0)
-                r = color_pos[0] + (1 - color_pos[0]) * (1 - intensity)
-                g = color_pos[1] + (1 - color_pos[1]) * (1 - intensity)
-                b = color_pos[2] + (1 - color_pos[2]) * (1 - intensity)
-            else:
-                intensity = min(abs(w), 1.0)
-                r = color_neg[0] + (1 - color_neg[0]) * (1 - intensity)
-                g = color_neg[1] + (1 - color_neg[1]) * (1 - intensity)
-                b = color_neg[2] + (1 - color_neg[2]) * (1 - intensity)
-            highlight_colors[i] = (r, g, b)
-
-        # Color bonds by averaging the weights of their two atoms
-        highlight_bonds = []
-        highlight_bond_colors = {}
-        highlight_atom_set = set(highlight_atoms)
-        for bond in mol.GetBonds():
-            a1 = bond.GetBeginAtomIdx()
-            a2 = bond.GetEndAtomIdx()
-            if a1 in highlight_atom_set or a2 in highlight_atom_set:
-                bond_idx = bond.GetIdx()
-                highlight_bonds.append(bond_idx)
-                w1 = norm[a1] if a1 < len(norm) else 0
-                w2 = norm[a2] if a2 < len(norm) else 0
-                avg_w = (w1 + w2) / 2
-                if avg_w > 0:
-                    intensity = min(abs(avg_w), 1.0)
-                    br = color_pos[0] + (1 - color_pos[0]) * (1 - intensity)
-                    bg = color_pos[1] + (1 - color_pos[1]) * (1 - intensity)
-                    bb = color_pos[2] + (1 - color_pos[2]) * (1 - intensity)
-                else:
-                    intensity = min(abs(avg_w), 1.0)
-                    br = color_neg[0] + (1 - color_neg[0]) * (1 - intensity)
-                    bg = color_neg[1] + (1 - color_neg[1]) * (1 - intensity)
-                    bb = color_neg[2] + (1 - color_neg[2]) * (1 - intensity)
-                highlight_bond_colors[bond_idx] = (br, bg, bb)
-
-        from rdkit.Chem.Draw import rdMolDraw2D
+        # Draw plain molecule and get pixel coordinates
         try:
             drawer = rdMolDraw2D.MolDraw2DCairo(size[0], size[1])
         except Exception:
             drawer = rdMolDraw2D.MolDraw2DSVG(size[0], size[1])
-        opts = drawer.drawOptions()
-        opts.clearBackground = True
-        opts.highlightRadius = 0.3
-
-        highlight_radii = {i: 0.3 for i in highlight_atoms}
-        drawer.DrawMolecule(
-            mol,
-            highlightAtoms=highlight_atoms,
-            highlightAtomColors=highlight_colors,
-            highlightAtomRadii=highlight_radii,
-            highlightBonds=highlight_bonds,
-            highlightBondColors=highlight_bond_colors,
-        )
+        drawer.drawOptions().clearBackground = True
+        drawer.DrawMolecule(mol)
         drawer.FinishDrawing()
+
+        # Get pixel coordinates from the drawer
+        atom_coords = []
+        for i in range(mol.GetNumAtoms()):
+            pt = drawer.GetDrawCoords(i)
+            atom_coords.append((int(pt.x), int(pt.y)))
+
         png = drawer.GetDrawingText()
-        from PIL import Image as PILImage
-        from io import BytesIO
-        return PILImage.open(BytesIO(png)).copy()
+        mol_img = PILImage.open(BytesIO(png)).convert("RGBA").copy()
+
+        # Make white background transparent so heatmap shows through
+        data = mol_img.getdata()
+        new_data = []
+        for item in data:
+            if item[0] > 240 and item[1] > 240 and item[2] > 240:
+                new_data.append((255, 255, 255, 0))
+            else:
+                new_data.append(item)
+        mol_img.putdata(new_data)
+
+        # Paint gaussian blobs at each atom's pixel position
+        heatmap = PILImage.new("RGBA", (size[0], size[1]), (255, 255, 255, 0))
+        radius = int(size[0] * 0.10)
+
+        for i, w in enumerate(norm):
+            if abs(w) < 0.05:
+                continue
+            px, py = atom_coords[i]
+            color = color_pos if w > 0 else color_neg
+            intensity = min(abs(w), 1.0)
+            r_val = int(color[0] * 255)
+            g_val = int(color[1] * 255)
+            b_val = int(color[2] * 255)
+            a_val = int(intensity * 255)
+
+            blob = PILImage.new("RGBA", (size[0], size[1]), (0, 0, 0, 0))
+            draw_ctx = ImageDraw.Draw(blob)
+            draw_ctx.ellipse(
+                [px - radius, py - radius, px + radius, py + radius],
+                fill=(r_val, g_val, b_val, a_val)
+            )
+            heatmap = PILImage.alpha_composite(heatmap, blob)
+
+        # Blur for smooth blending
+        blur_radius = int(size[0] * 0.05)
+        r, g, b, a = heatmap.split()
+        r = r.filter(ImageFilter.GaussianBlur(blur_radius))
+        g = g.filter(ImageFilter.GaussianBlur(blur_radius))
+        b = b.filter(ImageFilter.GaussianBlur(blur_radius))
+        a = a.filter(ImageFilter.GaussianBlur(blur_radius))
+        heatmap = PILImage.merge("RGBA", (r, g, b, a))
+
+        # Composite: white bg → heatmap → molecule
+        result = PILImage.alpha_composite(
+            PILImage.new("RGBA", size, (255, 255, 255, 255)),
+            heatmap
+        )
+        result = PILImage.alpha_composite(result, mol_img)
+        return result.convert("RGB")
 
     green = (0.13, 0.55, 0.13)
     red = (0.8, 0.1, 0.1)
