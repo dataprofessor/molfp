@@ -17,7 +17,7 @@ from rdkit.Chem import AllChem, MACCSkeys, RDKFingerprint, rdMolDescriptors, rdF
 from rdkit.Chem.EState.Fingerprinter import FingerprintMol
 
 from . import _smarts
-from .fingerprints import _ensure_mol, _get_substructure_patterns, _get_kr_patterns, _get_pubchem_computer
+from .fingerprints import _ensure_mol, _morgan_bit_info, _get_substructure_patterns, _get_kr_patterns, _get_pubchem_computer
 
 
 def explain(smiles_or_mol: Union[str, Chem.rdchem.Mol], fp_type: str) -> dict[int, Any]:
@@ -59,8 +59,7 @@ def explain(smiles_or_mol: Union[str, Chem.rdchem.Mol], fp_type: str) -> dict[in
 
 
 def _explain_ecfp4(mol, n_bits=1024):
-    bi = {}
-    AllChem.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=n_bits, bitInfo=bi)
+    bi = _morgan_bit_info(mol, 2, n_bits)
     return {bit: list(envs) for bit, envs in bi.items()}
 
 

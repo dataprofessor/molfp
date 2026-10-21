@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "molfp"
-version = "0.3.5"
+version = "0.3.6"
 description = "Interpretable molecular fingerprints with SHAP-driven chemical explanations"
 readme = "README.md"
 license = {text = "MIT"}
@@ -42,6 +42,9 @@ dependencies = [
     "scipy>=1.9",
     "joblib>=1.2",
     "shap>=0.42",
+    "mapchiral>=0.0.7",
+    "mordredcommunity>=2.0",
+    "e3fp>=1.2",
 ]
 
 [project.optional-dependencies]

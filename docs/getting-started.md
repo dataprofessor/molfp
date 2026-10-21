@@ -63,7 +63,7 @@ print(f"Train: {len(split['train_idx'])}, Test: {len(split['test_idx'])}")
 from sklearn.pipeline import make_pipeline
 from sklearn.ensemble import RandomForestClassifier
 
-pipe = make_pipeline(molfp.ECFPTransformer(), RandomForestClassifier())
+pipe = make_pipeline(molfp.FingerprintTransformer("ecfp4"), RandomForestClassifier())
 # pipe.fit(smiles_train, y_train)
 ```
 
@@ -80,7 +80,7 @@ fp = molfp.maccs("CCO")
 # Batch — returns numpy array
 fps = molfp.ecfp4(["CCO", "c1ccccc1", "CC(=O)Oc1ccccc1C(=O)O"])
 
-# All 30 available types
+# All 40 available types
 for name in molfp.available():
     fn, n_bits, desc = molfp.get(name)
     print(f"{name:>30s}  {n_bits:>5}  {desc}")
@@ -141,6 +141,6 @@ X = molfp.graph_vectors(smiles, type="standard", enriched=True)
 from sklearn.pipeline import make_pipeline
 from sklearn.ensemble import RandomForestClassifier
 
-pipe = make_pipeline(molfp.ECFPTransformer(), RandomForestClassifier())
+pipe = make_pipeline(molfp.FingerprintTransformer("ecfp4"), RandomForestClassifier())
 pipe.fit(smiles_train, y_train)
 ```

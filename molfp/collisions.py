@@ -14,7 +14,7 @@ import numpy as np
 from rdkit import Chem
 from rdkit.Chem import AllChem, rdMolDescriptors, rdFingerprintGenerator
 
-from .fingerprints import _ensure_mol
+from .fingerprints import _ensure_mol, _morgan_gen, _atompair_gen
 
 
 def detect_collisions(smiles_or_mol: Union[str, Chem.rdchem.Mol], fp_type: str = "ecfp4", n_bits: int = 1024) -> dict[int, list[int]]:
@@ -39,7 +39,7 @@ def detect_collisions(smiles_or_mol: Union[str, Chem.rdchem.Mol], fp_type: str =
 
 def _collisions_morgan(mol, n_bits):
     # Get unfolded (sparse) fingerprint with all unique hashes
-    sparse_fp = AllChem.GetMorganFingerprint(mol, radius=2)
+    sparse_fp = _morgan_gen(2).GetSparseCountFingerprint(mol)
     hashes = list(sparse_fp.GetNonzeroElements().keys())
 
     # Map each hash to its folded bit position
@@ -52,7 +52,7 @@ def _collisions_morgan(mol, n_bits):
 
 
 def _collisions_atompair(mol, n_bits):
-    sparse_fp = rdMolDescriptors.GetAtomPairFingerprint(mol)
+    sparse_fp = _atompair_gen().GetSparseCountFingerprint(mol)
     hashes = list(sparse_fp.GetNonzeroElements().keys())
 
     bit_to_hashes = {}
@@ -114,14 +114,14 @@ def collision_rate(smiles_list: list[Union[str, Chem.rdchem.Mol]], fp_type: str 
             n_collided = len(collisions)
 
             if fp_type == "ecfp4":
-                sparse = AllChem.GetMorganFingerprint(mol, radius=2)
+                sparse = _morgan_gen(2).GetSparseCountFingerprint(mol)
                 n_unique = len(sparse.GetNonzeroElements())
-                fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=n_bits)
+                fp = _morgan_gen(2, n_bits).GetFingerprint(mol)
                 n_set = fp.GetNumOnBits()
             elif fp_type == "atompairs2d":
-                sparse = rdMolDescriptors.GetAtomPairFingerprint(mol)
+                sparse = _atompair_gen().GetSparseCountFingerprint(mol)
                 n_unique = len(sparse.GetNonzeroElements())
-                fp = rdMolDescriptors.GetHashedAtomPairFingerprintAsBitVect(mol, nBits=n_bits)
+                fp = _atompair_gen(n_bits, count_simulation=True).GetFingerprint(mol)
                 n_set = fp.GetNumOnBits()
             else:
                 n_unique = 0

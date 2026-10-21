@@ -14,7 +14,7 @@
 
 **Interpretable molecular fingerprints with SHAP-driven chemical explanations.**
 
-A native Python/RDKit library that computes 35 molecular fingerprint types (18 2D + 9 3D + 8 graph-based) and provides built-in tools for interpretation, visualization, collision detection, activity cliff analysis, bioactivity profiling, and SHAP-based feature explanation.
+A native Python/RDKit library that computes 55 molecular fingerprint types (37 2D + 10 3D + 8 graph-based) and provides built-in tools for interpretation, visualization, collision detection, activity cliff analysis, bioactivity profiling, and SHAP-based feature explanation.
 
 ## Install
 
@@ -45,7 +45,7 @@ result = molfp.scaffold_split(smiles, test_size=0.2)
 
 ## Features
 
-- **35 fingerprint types** — 18 2D, 9 3D, 8 graph-based
+- **55 fingerprint types** — 37 2D, 10 3D, 8 graph-based
 - **Bit-level explainability** — atom attribution for every ON bit
 - **Chemical annotation** — human-readable names for fingerprint bits
 - **SHAP interpretation** — collision-aware feature importance with chemical meaning
@@ -55,18 +55,19 @@ result = molfp.scaffold_split(smiles, test_size=0.2)
 - **Bioactivity profiling** — enriched/depleted bit analysis
 - **Isomer discrimination** — test whether fingerprints distinguish structural isomers
 - **Graph representations** — 4 graph types with PyG/DGL converters
-- **sklearn compatible** — 27 transformers + GraphTransformer
+- **sklearn compatible** — FingerprintTransformer (any FP type) + GraphTransformer
 
 For molecule visualization (2D drawing, 3D viewing, attribution maps), see [molviewer](https://github.com/dataprofessor/molviewer): `pip install molviewer`
 
-## 35 Fingerprint Types
+## 40 Fingerprint Types
 
-### 2D Fingerprints (18 types)
+### 2D Fingerprints (23 types)
 
 | Type | Bits | Function |
 |------|------|----------|
 | MACCS Keys | 166 | `maccs()` |
 | ECFP4 (Morgan) | 1024 | `ecfp4()` |
+| FCFP4 (Feature Morgan) | 1024 | `fcfp4()` |
 | PubChem/CACTVS | 881 | `pubchem()` |
 | Substructure FP | 307 | `substructure()` |
 | Substructure Count | 307 | `substructure_count()` |
@@ -75,14 +76,18 @@ For molecule visualization (2D drawing, 3D viewing, attribution maps), see [molv
 | E-State | 79 | `estate()` |
 | AtomPairs2D | 780 | `atompairs2d()` |
 | AtomPairs2D Count | 780 | `atompairs2d_count()` |
-| RDK | 1024 | `rdk()` |
-| RDK Extended | 1024 | `rdk_ext()` |
-| RDK GraphOnly | 1024 | `rdk_graphonly()` |
-| FCFP4 (Feature Morgan) | 1024 | `fcfp4()` |
+| RDKit path-based | 1024 | `rdk()` |
+| RDKit Extended | 1024 | `rdk_ext()` |
+| RDKit GraphOnly | 1024 | `rdk_graphonly()` |
 | Lingo | 1024 | `lingo()` |
 | Shortest Path | 1024 | `shortest_path()` |
 | Hybridization | 1024 | `hybridization()` |
 | Signature | 1024 | `signature()` |
+| Topological Torsion | 2048 | `topological_torsion()` |
+| Avalon | 1024 | `avalon()` |
+| MHFP | 1024 | `mhfp()` |
+| MAP4 | 1024 | `map4()` |
+| MAP4C (Chiral) | 1024 | `map4c()` |
 
 ### 3D Fingerprints (9 types)
 

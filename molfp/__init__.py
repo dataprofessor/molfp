@@ -1,7 +1,7 @@
 """
 molfp — Interpretable molecular fingerprints with SHAP-driven chemical explanations.
 
-35 fingerprint types (18 2D + 9 3D + 8 graph) plus analysis modules:
+55 fingerprint types (37 2D + 10 3D + 8 graph) plus analysis modules:
   - explain/annotate: bit-level explainability and chemical annotation
   - interpret: SHAP interpretation with chemical meaning
   - collisions: hash collision detection, removal, and collision-free mode
@@ -15,7 +15,7 @@ molfp — Interpretable molecular fingerprints with SHAP-driven chemical explana
   - scaffold: scaffold extraction, fingerprinting, and scaffold-aware splitting
   - viz: use molviewer package for 2D drawing, 3D viewing, and attribution maps
   - standardize: desalt, neutralize, canonicalize, deduplicate
-  - sklearn: 27 transformers + GraphTransformer for pipelines
+  - sklearn: FingerprintTransformer (universal) + GraphTransformer for pipelines
 
 Usage:
     import molfp
@@ -36,7 +36,7 @@ Usage:
     result = molfp.interpret(smiles, activities, fp_type="ecfp4", collision_aware=True)
 """
 
-__version__ = "0.3.5"
+__version__ = "0.3.6"
 
 # ── Core fingerprint functions ────────────────────────────────────────────────
 from .fingerprints import (
@@ -64,6 +64,21 @@ from .fingerprints import (
     mhfp,
     map4,
     map4c,
+    secfp,
+    erg,
+    pharmacophore,
+    layered,
+    pattern,
+    e3fp,
+    mqn,
+    ghose_crippen,
+    bcut2d,
+    shed,
+    functional_groups,
+    physiochemical,
+    cats2d,
+    mordred,
+    rdkit2d,
     atompairs3d,
     atompairs3d_count,
     usr,
@@ -119,16 +134,7 @@ from .standardize import (
     standardize_batch, deduplicate, preprocess,
     smiles_to_mol, mol_to_smiles,
 )
-from .sklearn import (
-    MACCSTransformer, ECFPTransformer, FCFPTransformer, PubChemTransformer,
-    SubstructureTransformer, SubstructureCountTransformer,
-    KlekotaRothTransformer, KlekotaRothCountTransformer,
-    EStateTransformer, AtomPairs2DTransformer, AtomPairs2DCountTransformer,
-    RDKTransformer, RDKExtTransformer, RDKGraphOnlyTransformer,
-    LingoTransformer, ShortestPathTransformer, HybridizationTransformer, SignatureTransformer,
-    AtomPairs3DTransformer, AtomPairs3DCountTransformer,
-    get_transformer, TRANSFORMERS,
-)
+from .sklearn import FingerprintTransformer, get_transformer, TRANSFORMERS
 from .interpret import interpret, interpret_molecule, compare_molecules
 from .distance import (
     tanimoto, dice, cosine, sokal_michener, russel_rao,
@@ -147,3 +153,7 @@ from .scaffold import scaffold, scaffold_fingerprint, scaffold_split
 # Register graph fingerprints after both modules are loaded
 from .fingerprints import _register_graph_fingerprints
 _register_graph_fingerprints()
+
+# Rebuild TRANSFORMERS to include graph fingerprints
+from .sklearn import _rebuild_transformers
+_rebuild_transformers()

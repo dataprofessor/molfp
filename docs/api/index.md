@@ -60,7 +60,7 @@ Browse the modules below for function details and examples.
 
 ### [Fingerprints](fingerprints.md)
 
-Compute 35 molecular fingerprint types (18 2D + 9 3D + 8 graph). Every function accepts a single SMILES, a list, a pandas Series, or a DataFrame column.
+Compute 55 molecular fingerprint types (37 2D + 10 3D + 8 graph). Every function accepts a single SMILES, a list, a pandas Series, or a DataFrame column.
 
 ```python
 fp = molfp.maccs("CCO")
@@ -189,12 +189,12 @@ result = molfp.remove_low_variance(X, threshold=0.01)
 
 ### [sklearn](sklearn.md)
 
-22 pipeline-ready transformers (one per FP type) plus `GraphTransformer`. Drop into any scikit-learn pipeline.
+A single `FingerprintTransformer` wraps any fingerprint type for sklearn Pipelines. `fp_type` is a hyperparameter — grid search across fingerprint types in one go.
 
 ```python
 from sklearn.pipeline import make_pipeline
 from sklearn.ensemble import RandomForestClassifier
-pipe = make_pipeline(molfp.ECFPTransformer(), RandomForestClassifier())
+pipe = make_pipeline(molfp.FingerprintTransformer("ecfp4"), RandomForestClassifier())
 ```
 
 ---

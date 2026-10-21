@@ -15,15 +15,15 @@
 
 **Interpretable molecular fingerprints with SHAP-driven chemical explanations.**
 
-A native Python/RDKit library that computes 35 molecular fingerprint types (18 2D + 9 3D + 8 graph-based) and provides built-in tools for interpretation, collision detection, activity cliff analysis, bioactivity profiling, and SHAP-based feature explanation.
+A native Python/RDKit library that computes 55 molecular fingerprint types (37 2D + 10 3D + 8 graph-based) and provides built-in tools for interpretation, collision detection, activity cliff analysis, bioactivity profiling, and SHAP-based feature explanation.
 
 For molecule visualization (2D drawing, 3D viewing, attribution maps), see [molviewer](https://github.com/dataprofessor/molviewer): `pip install molviewer`
 
 ## Features
 
-### 35 Fingerprint Types
+### 40 Fingerprint Types
 
-#### 2D Fingerprints (18 types)
+#### 2D Fingerprints (23 types)
 
 | Type | Bits | Function |
 |------|------|----------|
@@ -45,6 +45,11 @@ For molecule visualization (2D drawing, 3D viewing, attribution maps), see [molv
 | Shortest Path | 1024 | `molfp.shortest_path()` |
 | Hybridization | 1024 | `molfp.hybridization()` |
 | Signature | 1024 | `molfp.signature()` |
+| Topological Torsion | 2048 | `molfp.topological_torsion()` |
+| Avalon | 1024 | `molfp.avalon()` |
+| MHFP | 1024 | `molfp.mhfp()` |
+| MAP4 | 1024 | `molfp.map4()` |
+| MAP4C (Chiral) | 1024 | `molfp.map4c()` |
 
 #### 3D Fingerprints (9 types)
 
@@ -187,17 +192,25 @@ molfp.pairwise(X, metric="tanimoto") # (N, N_bits) → (N, N) matrix (vectorized
 
 ### scikit-learn Compatible
 
-All 35 FP types as sklearn transformers with Pipeline, GridSearchCV, and FeatureUnion support:
+A single `FingerprintTransformer` wraps any fingerprint type for use in sklearn Pipelines, GridSearchCV, and FeatureUnion:
 
 ```python
 from sklearn.pipeline import make_pipeline
 from sklearn.ensemble import RandomForestClassifier
 
 pipe = make_pipeline(
-    molfp.ECFPTransformer(n_bits=2048, n_jobs=-1),
+    molfp.FingerprintTransformer("ecfp4", n_bits=2048, n_jobs=-1),
     RandomForestClassifier()
 )
 pipe.fit(smiles_train, y_train)
+
+# Grid search across fingerprint types — fp_type is a hyperparameter
+from sklearn.model_selection import GridSearchCV
+param_grid = {
+    "fingerprinttransformer__fp_type": ["ecfp4", "rdk", "maccs", "map4"],
+    "fingerprinttransformer__n_bits": [512, 1024, 2048],
+}
+search = GridSearchCV(pipe, param_grid, cv=5)
 ```
 
 ### Sparse Matrix & Parallelism

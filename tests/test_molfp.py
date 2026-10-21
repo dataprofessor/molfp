@@ -35,7 +35,7 @@ class TestCoreFingerprints:
 
     def test_available_returns_30(self):
         fps = molfp.available()
-        assert len(fps) == 40
+        assert len(fps) == 55
 
     @pytest.mark.parametrize("fp_name,expected_len", [
         ("maccs", 166),
@@ -647,60 +647,60 @@ class TestSklearnTransformers:
 
     # ── Basic transformer API ────────────────────────────────────────────────
 
-    @pytest.mark.parametrize("cls,expected_bits", [
-        (molfp.MACCSTransformer, 166),
-        (molfp.PubChemTransformer, 881),
-        (molfp.SubstructureTransformer, 307),
-        (molfp.SubstructureCountTransformer, 307),
-        (molfp.KlekotaRothTransformer, 4860),
-        (molfp.KlekotaRothCountTransformer, 4860),
-        (molfp.EStateTransformer, 79),
+    @pytest.mark.parametrize("fp_type,expected_bits", [
+        ("maccs", 166),
+        ("pubchem", 881),
+        ("substructure", 307),
+        ("substructure_count", 307),
+        ("klekota_roth", 4860),
+        ("klekota_roth_count", 4860),
+        ("estate", 79),
     ])
-    def test_fixed_size_transformer_shape(self, cls, expected_bits):
-        t = cls()
+    def test_fixed_size_transformer_shape(self, fp_type, expected_bits):
+        t = molfp.FingerprintTransformer(fp_type)
         X = t.fit_transform(SMILES_SET[:3])
         assert X.shape == (3, expected_bits)
         assert X.dtype == np.int32
 
-    @pytest.mark.parametrize("cls,default_bits", [
-        (molfp.ECFPTransformer, 1024),
-        (molfp.AtomPairs2DTransformer, 780),
-        (molfp.AtomPairs2DCountTransformer, 780),
-        (molfp.RDKTransformer, 1024),
-        (molfp.RDKExtTransformer, 1024),
-        (molfp.RDKGraphOnlyTransformer, 1024),
+    @pytest.mark.parametrize("fp_type,default_bits", [
+        ("ecfp4", 1024),
+        ("atompairs2d", 780),
+        ("atompairs2d_count", 780),
+        ("rdk", 1024),
+        ("rdk_ext", 1024),
+        ("rdk_graphonly", 1024),
     ])
-    def test_variable_size_transformer_default(self, cls, default_bits):
-        t = cls()
+    def test_variable_size_transformer_default(self, fp_type, default_bits):
+        t = molfp.FingerprintTransformer(fp_type)
         X = t.fit_transform(SMILES_SET[:3])
         assert X.shape == (3, default_bits)
 
     def test_ecfp_custom_n_bits(self):
-        t = molfp.ECFPTransformer(n_bits=512)
+        t = molfp.FingerprintTransformer("ecfp4", n_bits=512)
         X = t.fit_transform(SMILES_SET[:3])
         assert X.shape == (3, 512)
 
     def test_atompairs_custom_n_bits(self):
-        t = molfp.AtomPairs2DTransformer(n_bits=2048)
+        t = molfp.FingerprintTransformer("atompairs2d", n_bits=2048)
         X = t.fit_transform(SMILES_SET[:3])
         assert X.shape == (3, 2048)
 
     def test_rdk_custom_n_bits(self):
-        t = molfp.RDKTransformer(n_bits=2048)
+        t = molfp.FingerprintTransformer("rdk", n_bits=2048)
         X = t.fit_transform(SMILES_SET[:3])
         assert X.shape == (3, 2048)
 
     # ── fit/transform/fit_transform consistency ──────────────────────────────
 
     def test_fit_returns_self(self):
-        t = molfp.MACCSTransformer()
+        t = molfp.FingerprintTransformer("maccs")
         result = t.fit(SMILES_SET)
         assert result is t
 
     def test_transform_matches_fit_transform(self):
-        t = molfp.ECFPTransformer(n_bits=512)
+        t = molfp.FingerprintTransformer("ecfp4", n_bits=512)
         X1 = t.fit_transform(SMILES_SET[:4])
-        t2 = molfp.ECFPTransformer(n_bits=512)
+        t2 = molfp.FingerprintTransformer("ecfp4", n_bits=512)
         t2.fit(SMILES_SET[:4])
         X2 = t2.transform(SMILES_SET[:4])
         np.testing.assert_array_equal(X1, X2)
@@ -708,19 +708,19 @@ class TestSklearnTransformers:
     # ── get_params / set_params ──────────────────────────────────────────────
 
     def test_get_params_fixed(self):
-        t = molfp.MACCSTransformer(n_jobs=2, sparse=True)
+        t = molfp.FingerprintTransformer("maccs", n_jobs=2, sparse=True)
         params = t.get_params()
         assert params["n_jobs"] == 2
         assert params["sparse"] is True
 
     def test_get_params_variable(self):
-        t = molfp.ECFPTransformer(n_bits=2048, n_jobs=-1)
+        t = molfp.FingerprintTransformer("ecfp4", n_bits=2048, n_jobs=-1)
         params = t.get_params()
         assert params["n_bits"] == 2048
         assert params["n_jobs"] == -1
 
     def test_set_params(self):
-        t = molfp.ECFPTransformer(n_bits=1024)
+        t = molfp.FingerprintTransformer("ecfp4", n_bits=1024)
         t.set_params(n_bits=512)
         assert t.n_bits == 512
         X = t.transform(SMILES_SET[:2])
@@ -729,50 +729,50 @@ class TestSklearnTransformers:
     # ── get_feature_names_out ────────────────────────────────────────────────
 
     def test_feature_names_maccs(self):
-        t = molfp.MACCSTransformer()
+        t = molfp.FingerprintTransformer("maccs")
         names = t.get_feature_names_out()
         assert len(names) == 166
         assert names[0] == "MACCS_0"
         assert names[-1] == "MACCS_165"
 
     def test_feature_names_ecfp(self):
-        t = molfp.ECFPTransformer(n_bits=512)
+        t = molfp.FingerprintTransformer("ecfp4", n_bits=512)
         names = t.get_feature_names_out()
         assert len(names) == 512
 
     def test_feature_names_pubchem(self):
-        names = molfp.PubChemTransformer().get_feature_names_out()
+        names = molfp.FingerprintTransformer("pubchem").get_feature_names_out()
         assert len(names) == 881
 
     # ── Sparse output ────────────────────────────────────────────────────────
 
     def test_sparse_output_type(self):
         from scipy.sparse import issparse
-        t = molfp.MACCSTransformer(sparse=True)
+        t = molfp.FingerprintTransformer("maccs", sparse=True)
         X = t.fit_transform(SMILES_SET[:3])
         assert issparse(X)
         assert X.shape == (3, 166)
 
     def test_sparse_matches_dense(self):
-        X_dense = molfp.MACCSTransformer().fit_transform(SMILES_SET[:4])
-        X_sparse = molfp.MACCSTransformer(sparse=True).fit_transform(SMILES_SET[:4])
+        X_dense = molfp.FingerprintTransformer("maccs").fit_transform(SMILES_SET[:4])
+        X_sparse = molfp.FingerprintTransformer("maccs", sparse=True).fit_transform(SMILES_SET[:4])
         np.testing.assert_array_equal(X_dense, X_sparse.toarray())
 
     def test_sparse_kr_memory_savings(self):
-        X_dense = molfp.KlekotaRothTransformer().fit_transform(SMILES_SET[:3])
-        X_sparse = molfp.KlekotaRothTransformer(sparse=True).fit_transform(SMILES_SET[:3])
+        X_dense = molfp.FingerprintTransformer("klekota_roth").fit_transform(SMILES_SET[:3])
+        X_sparse = molfp.FingerprintTransformer("klekota_roth", sparse=True).fit_transform(SMILES_SET[:3])
         sparse_bytes = X_sparse.data.nbytes + X_sparse.indices.nbytes + X_sparse.indptr.nbytes
         assert sparse_bytes < X_dense.nbytes
 
     # ── Parallelism ──────────────────────────────────────────────────────────
 
     def test_parallel_matches_sequential(self):
-        X_seq = molfp.MACCSTransformer(n_jobs=1).fit_transform(SMILES_SET)
-        X_par = molfp.MACCSTransformer(n_jobs=2).fit_transform(SMILES_SET)
+        X_seq = molfp.FingerprintTransformer("maccs", n_jobs=1).fit_transform(SMILES_SET)
+        X_par = molfp.FingerprintTransformer("maccs", n_jobs=2).fit_transform(SMILES_SET)
         np.testing.assert_array_equal(X_seq, X_par)
 
     def test_parallel_all_cpus(self):
-        X = molfp.EStateTransformer(n_jobs=-1).fit_transform(SMILES_SET[:4])
+        X = molfp.FingerprintTransformer("estate", n_jobs=-1).fit_transform(SMILES_SET[:4])
         assert X.shape == (4, 79)
 
     # ── sklearn Pipeline integration ─────────────────────────────────────────
@@ -785,7 +785,7 @@ class TestSklearnTransformers:
         y = [0, 0, 1, 1, 0, 1]
 
         pipe = make_pipeline(
-            molfp.ECFPTransformer(n_bits=256),
+            molfp.FingerprintTransformer("ecfp4", n_bits=256),
             RandomForestClassifier(n_estimators=10, random_state=42),
         )
         pipe.fit(smiles, y)
@@ -802,7 +802,7 @@ class TestSklearnTransformers:
         y = [0, 0, 1, 1, 0, 1]
 
         pipe = make_pipeline(
-            molfp.MACCSTransformer(),
+            molfp.FingerprintTransformer("maccs"),
             RandomForestClassifier(n_estimators=10, random_state=42),
         )
         scores = cross_val_score(pipe, smiles, y, cv=2)
@@ -813,9 +813,9 @@ class TestSklearnTransformers:
         from sklearn.pipeline import make_union
 
         union = make_union(
-            molfp.ECFPTransformer(n_bits=256),
-            molfp.MACCSTransformer(),
-            molfp.EStateTransformer(),
+            molfp.FingerprintTransformer("ecfp4", n_bits=256),
+            molfp.FingerprintTransformer("maccs"),
+            molfp.FingerprintTransformer("estate"),
         )
         X = union.fit_transform(SMILES_SET[:3])
         assert X.shape == (3, 256 + 166 + 79)
@@ -826,17 +826,17 @@ class TestSklearnTransformers:
         from sklearn.model_selection import GridSearchCV
 
         pipe = make_pipeline(
-            molfp.ECFPTransformer(),
+            molfp.FingerprintTransformer("ecfp4"),
             RandomForestRegressor(random_state=42),
         )
         param_grid = {
-            "ecfptransformer__n_bits": [256, 512],
+            "fingerprinttransformer__n_bits": [256, 512],
             "randomforestregressor__n_estimators": [10, 50],
         }
         gs = GridSearchCV(pipe, param_grid, cv=2, scoring="r2")
         gs.fit(SMILES_SET, ACTIVITIES)
         assert gs.best_params_ is not None
-        assert "ecfptransformer__n_bits" in gs.best_params_
+        assert "fingerprinttransformer__n_bits" in gs.best_params_
 
     def test_pipeline_feature_selection(self):
         from sklearn.pipeline import make_pipeline
@@ -847,7 +847,7 @@ class TestSklearnTransformers:
         y = [0, 0, 1, 1, 0, 1]
 
         pipe = make_pipeline(
-            molfp.MACCSTransformer(),
+            molfp.FingerprintTransformer("maccs"),
             SelectKBest(f_classif, k=10),
             RandomForestClassifier(n_estimators=10, random_state=42),
         )
@@ -859,7 +859,7 @@ class TestSklearnTransformers:
 
     def test_get_transformer_by_name(self):
         t = molfp.get_transformer("ecfp4", n_bits=2048)
-        assert isinstance(t, molfp.ECFPTransformer)
+        assert isinstance(t, molfp.FingerprintTransformer)
         assert t.n_bits == 2048
 
     def test_get_transformer_all_names(self):
@@ -903,16 +903,11 @@ class TestSklearnTransformers:
 
     # ── TRANSFORMERS registry ────────────────────────────────────────────────
 
-    def test_transformers_registry_has_all_22(self):
-        assert len(molfp.TRANSFORMERS) == 32
+    def test_transformers_registry_has_all(self):
+        assert len(molfp.TRANSFORMERS) == len(molfp.FINGERPRINTS)
 
-    def test_transformers_registry_matches_base_fingerprints(self):
-        # Transformers cover the 22 non-graph fingerprints
-        graph_fps = {"graph_standard", "graph_distance", "graph_line", "graph_fragment",
-                     "graph_standard_enriched", "graph_distance_enriched",
-                     "graph_line_enriched", "graph_fragment_enriched"}
-        fp_names = set(molfp.FINGERPRINTS.keys()) - graph_fps
-        assert set(molfp.TRANSFORMERS.keys()) == fp_names
+    def test_transformers_registry_matches_fingerprints(self):
+        assert set(molfp.TRANSFORMERS.keys()) == set(molfp.FINGERPRINTS.keys())
 
 
 # =============================================================================
@@ -2130,7 +2125,7 @@ class TestNewFingerprints:
         assert len(fp) == 2048
 
     def test_fcfp4_transformer(self):
-        t = molfp.FCFPTransformer()
+        t = molfp.FingerprintTransformer("fcfp4")
         X = t.fit_transform(SMILES_SET)
         assert X.shape == (len(SMILES_SET), 1024)
 
@@ -2151,7 +2146,7 @@ class TestNewFingerprints:
         assert fps.shape == (len(SMILES_SET), 1024)
 
     def test_lingo_transformer(self):
-        t = molfp.LingoTransformer()
+        t = molfp.FingerprintTransformer("lingo")
         X = t.fit_transform(SMILES_SET)
         assert X.shape == (len(SMILES_SET), 1024)
 
@@ -2172,7 +2167,7 @@ class TestNewFingerprints:
         assert sum(fp) > 0
 
     def test_shortest_path_transformer(self):
-        t = molfp.ShortestPathTransformer()
+        t = molfp.FingerprintTransformer("shortest_path")
         X = t.fit_transform(SMILES_SET)
         assert X.shape == (len(SMILES_SET), 1024)
 
@@ -2193,7 +2188,7 @@ class TestNewFingerprints:
         assert fp_rdk != fp_hyb
 
     def test_hybridization_transformer(self):
-        t = molfp.HybridizationTransformer()
+        t = molfp.FingerprintTransformer("hybridization")
         X = t.fit_transform(SMILES_SET)
         assert X.shape == (len(SMILES_SET), 1024)
 
@@ -2214,9 +2209,71 @@ class TestNewFingerprints:
         assert fp1 == fp2
 
     def test_signature_transformer(self):
-        t = molfp.SignatureTransformer()
+        t = molfp.FingerprintTransformer("signature")
         X = t.fit_transform(SMILES_SET)
         assert X.shape == (len(SMILES_SET), 1024)
+
+
+# =============================================================================
+# Hash stability across processes
+# =============================================================================
+
+# Fingerprints that hash strings. Built-in hash() is salted per process, so these
+# must use a stable hash or they change between sessions and n_jobs workers.
+STRING_HASHED_FPS = ["mhfp", "map4", "secfp", "lingo", "signature"]
+
+
+class TestHashStability:
+
+    @staticmethod
+    def _fp_in_subprocess(fp_type, hash_seed):
+        import json
+        import subprocess
+        code = (
+            "import sys, json; sys.path.insert(0, sys.argv[1]); import molfp; "
+            f"print(json.dumps(list(map(int, molfp.FINGERPRINTS[{fp_type!r}][0]({ASPIRIN!r})))))"
+        )
+        env = {**os.environ, "PYTHONHASHSEED": str(hash_seed)}
+        root = os.path.join(os.path.dirname(__file__), "..")
+        out = subprocess.run([sys.executable, "-c", code, root], env=env,
+                             capture_output=True, text=True, check=True).stdout
+        return json.loads(out.strip().splitlines()[-1])
+
+    @pytest.mark.parametrize("fp_type", STRING_HASHED_FPS)
+    def test_same_bits_across_sessions(self, fp_type):
+        assert self._fp_in_subprocess(fp_type, 1) == self._fp_in_subprocess(fp_type, 2)
+
+    @pytest.mark.parametrize("fp_type", STRING_HASHED_FPS)
+    def test_same_bits_across_n_jobs_workers(self, fp_type):
+        X = np.asarray(molfp.FingerprintTransformer(fp_type, n_jobs=4).fit_transform([ASPIRIN] * 32))
+        single = np.asarray(molfp.FingerprintTransformer(fp_type).fit_transform([ASPIRIN]))
+        assert (X == single).all()
+
+
+# =============================================================================
+# RDKit descriptor list is pinned
+# =============================================================================
+
+class TestPinnedDescriptors:
+    """RDKit's descList length and order change between releases; molfp must not."""
+
+    def test_pinned_list_is_210_unique(self):
+        from molfp._rdkit_descriptors import DESCRIPTOR_NAMES
+        assert len(DESCRIPTOR_NAMES) == 210
+        assert len(set(DESCRIPTOR_NAMES)) == 210
+
+    @pytest.mark.parametrize("fp_type", ["physiochemical", "rdkit2d"])
+    def test_length_independent_of_rdkit_version(self, fp_type):
+        assert len(molfp.FINGERPRINTS[fp_type][0](ASPIRIN)) == 210
+
+    def test_columns_follow_pinned_names(self):
+        from rdkit import Chem
+        from rdkit.Chem import Descriptors
+        from molfp._rdkit_descriptors import DESCRIPTOR_NAMES
+        values = molfp.FINGERPRINTS["rdkit2d"][0](ASPIRIN)
+        mol = Chem.MolFromSmiles(ASPIRIN)
+        for name in ("MolWt", "TPSA", "NumHDonors"):
+            assert values[DESCRIPTOR_NAMES.index(name)] == pytest.approx(getattr(Descriptors, name)(mol))
 
 
 # =============================================================================

@@ -2,8 +2,8 @@ cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 type: software
 title: "molfp"
-version: "0.3.1"
-date-released: "2026-10-13"
+version: "0.3.6"
+date-released: "2026-10-21"
 license: MIT
 url: "https://github.com/dataprofessor/molfp"
 repository-code: "https://github.com/dataprofessor/molfp"

@@ -17,7 +17,7 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from rdkit import Chem
 from rdkit.Chem import rdchem, AllChem, rdMolDescriptors
 
-from .fingerprints import _ensure_mol, _extract_smiles, _ensure_conformer
+from .fingerprints import _ensure_mol, _extract_smiles, _ensure_conformer, _morgan_bit_info
 
 
 # ── Feature registries ───────────────────────────────────────────────────────
@@ -154,8 +154,7 @@ def _enriched_atom_features(mol):
     # Morgan environment hashes per atom at radii 0, 1, 2
     morgan_feats = np.zeros((n_atoms, 3 * _MORGAN_HASH_BINS), dtype=np.float32)
     for radius in range(3):
-        bi = {}
-        AllChem.GetMorganFingerprintAsBitVect(mol, radius, nBits=_MORGAN_HASH_BINS, bitInfo=bi)
+        bi = _morgan_bit_info(mol, radius, _MORGAN_HASH_BINS)
         for bit, atom_list in bi.items():
             for center_atom, rad in atom_list:
                 if rad == radius:

@@ -10,6 +10,7 @@ Each function accepts:
 
 from __future__ import annotations
 
+import hashlib
 from typing import Union
 
 import numpy as np
@@ -128,6 +129,69 @@ def _get_graphonly_gen(n_bits=1024):
     return _cache[key]
 
 
+# rdFingerprintGenerator replacements for the deprecated AllChem/rdMolDescriptors
+# fingerprint functions. Output is bit-identical; n_bits=None means unfolded (sparse).
+def _morgan_gen(radius=2, n_bits=None, features=False):
+    key = f"morgan_gen_{radius}_{n_bits}_{features}"
+    if key not in _cache:
+        kwargs = {"radius": radius}
+        if n_bits is not None:
+            kwargs["fpSize"] = n_bits
+        if features:
+            kwargs["atomInvariantsGenerator"] = rdFingerprintGenerator.GetMorganFeatureAtomInvGen()
+        _cache[key] = rdFingerprintGenerator.GetMorganGenerator(**kwargs)
+    return _cache[key]
+
+
+def _atompair_gen(n_bits=None, use_2d=True, count_simulation=False):
+    # count_simulation=True reproduces the old hashed *bit-vector* atom pairs
+    key = f"atompair_gen_{n_bits}_{use_2d}_{count_simulation}"
+    if key not in _cache:
+        kwargs = {"use2D": use_2d, "countSimulation": count_simulation}
+        if n_bits is not None:
+            kwargs["fpSize"] = n_bits
+        _cache[key] = rdFingerprintGenerator.GetAtomPairGenerator(**kwargs)
+    return _cache[key]
+
+
+def _torsion_gen(n_bits):
+    key = f"torsion_gen_{n_bits}"
+    if key not in _cache:
+        _cache[key] = rdFingerprintGenerator.GetTopologicalTorsionGenerator(fpSize=n_bits, countSimulation=True)
+    return _cache[key]
+
+
+def _morgan_bit_info(mol, radius, n_bits=None):
+    """Morgan bit -> ((atom_idx, radius), ...), like the old bitInfo argument."""
+    ao = rdFingerprintGenerator.AdditionalOutput()
+    ao.AllocateBitInfoMap()
+    gen = _morgan_gen(radius, n_bits)
+    if n_bits is None:
+        gen.GetSparseCountFingerprint(mol, additionalOutput=ao)
+    else:
+        gen.GetFingerprint(mol, additionalOutput=ao)
+    return ao.GetBitInfoMap()
+
+
+def _get_descriptor_funcs():
+    """RDKit descriptor functions in molfp's pinned order; None if this RDKit lacks one."""
+    if "descriptor_funcs" not in _cache:
+        from rdkit.Chem import Descriptors as _Desc
+        from ._rdkit_descriptors import DESCRIPTOR_NAMES
+        available = dict(_Desc.descList)
+        _cache["descriptor_funcs"] = [available.get(name) for name in DESCRIPTOR_NAMES]
+    return _cache["descriptor_funcs"]
+
+
+def _stable_hash(value):
+    """Hash that is identical across Python sessions and worker processes.
+
+    Built-in hash() is salted per process for str (PYTHONHASHSEED), so it gives
+    different bits each session and inconsistent rows under n_jobs > 1.
+    """
+    return int.from_bytes(hashlib.blake2b(repr(value).encode(), digest_size=8).digest(), "little")
+
+
 # ── Single-molecule core functions (private) ──────────────────────────────────
 
 def _maccs_single(smiles_or_mol):
@@ -142,8 +206,8 @@ def _maccs_single(smiles_or_mol):
 def _ecfp4_single(smiles_or_mol, n_bits=1024, collision_free=False):
     mol = _ensure_mol(smiles_or_mol)
     if collision_free:
-        return _multihash_fold(AllChem.GetMorganFingerprint(mol, radius=2), n_bits)
-    fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=n_bits)
+        return _multihash_fold(_morgan_gen(2).GetSparseCountFingerprint(mol), n_bits)
+    fp = _morgan_gen(2, n_bits).GetFingerprint(mol)
     arr = np.zeros(n_bits, dtype=np.int32)
     AllChem.DataStructs.ConvertToNumpyArray(fp, arr)
     return arr.tolist()
@@ -151,8 +215,8 @@ def _ecfp4_single(smiles_or_mol, n_bits=1024, collision_free=False):
 def _fcfp4_single(smiles_or_mol, n_bits=1024, collision_free=False):
     mol = _ensure_mol(smiles_or_mol)
     if collision_free:
-        return _multihash_fold(AllChem.GetMorganFingerprint(mol, radius=2, useFeatures=True), n_bits)
-    fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=n_bits, useFeatures=True)
+        return _multihash_fold(_morgan_gen(2, features=True).GetSparseCountFingerprint(mol), n_bits)
+    fp = _morgan_gen(2, n_bits, features=True).GetFingerprint(mol)
     arr = np.zeros(n_bits, dtype=np.int32)
     AllChem.DataStructs.ConvertToNumpyArray(fp, arr)
     return arr.tolist()
@@ -164,7 +228,7 @@ def _lingo_single(smiles_or_mol, n_bits=1024):
     arr = np.zeros(n_bits, dtype=np.int32)
     if len(smi) >= q:
         for i in range(len(smi) - q + 1):
-            h = hash(smi[i:i + q]) % n_bits
+            h = _stable_hash(smi[i:i + q]) % n_bits
             arr[h] = 1
     return arr.tolist()
 
@@ -200,13 +264,13 @@ def _signature_single(smiles_or_mol, n_bits=1024, max_radius=3):
                 sig = Chem.MolToSmiles(submol)
             else:
                 sig = mol.GetAtomWithIdx(atom_idx).GetSymbol()
-            h = hash((sig, r)) % n_bits
+            h = _stable_hash((sig, r)) % n_bits
             arr[h] = 1
     return arr.tolist()
 
 def _topological_torsion_single(smiles_or_mol, n_bits=2048):
     mol = _ensure_mol(smiles_or_mol)
-    fp = rdMolDescriptors.GetHashedTopologicalTorsionFingerprintAsBitVect(mol, nBits=n_bits)
+    fp = _torsion_gen(n_bits).GetFingerprint(mol)
     arr = np.zeros(n_bits, dtype=np.int32)
     DataStructs.ConvertToNumpyArray(fp, arr)
     return arr.tolist()
@@ -220,8 +284,7 @@ def _avalon_single(smiles_or_mol, n_bits=1024):
 
 def _mhfp_single(smiles_or_mol, n_bits=1024, radius=3):
     mol = _ensure_mol(smiles_or_mol)
-    info = {}
-    AllChem.GetMorganFingerprint(mol, radius, bitInfo=info)
+    info = _morgan_bit_info(mol, radius)
     shingles = set()
     for bit, envs in info.items():
         for atom_idx, r in envs:
@@ -233,13 +296,12 @@ def _mhfp_single(smiles_or_mol, n_bits=1024, radius=3):
                 shingles.add(mol.GetAtomWithIdx(atom_idx).GetSymbol())
     arr = np.zeros(n_bits, dtype=np.int32)
     for s in shingles:
-        arr[hash(s) % n_bits] = 1
+        arr[_stable_hash(s) % n_bits] = 1
     return arr.tolist()
 
 def _map4_single(smiles_or_mol, n_bits=1024, radius=2):
     mol = _ensure_mol(smiles_or_mol)
-    info = {}
-    AllChem.GetMorganFingerprint(mol, radius, bitInfo=info)
+    info = _morgan_bit_info(mol, radius)
     atom_envs = {}
     for bit, envs in info.items():
         for atom_idx, r in envs:
@@ -261,7 +323,7 @@ def _map4_single(smiles_or_mol, n_bits=1024, radius=2):
             d = int(dm[a1][a2])
             s1, s2 = atom_envs[a1][0], atom_envs[a2][0]
             pair = f"{min(s1,s2)}|{d}|{max(s1,s2)}"
-            arr[hash(pair) % n_bits] = 1
+            arr[_stable_hash(pair) % n_bits] = 1
     return arr.tolist()
 
 def _map4c_single(smiles_or_mol, n_bits=1024):
@@ -298,6 +360,276 @@ def _multihash_fold(sparse_fp, n_bits, n_hashes=2):
             bit = ((h * seed) ^ (seed * 0x5BD1E995)) % n_bits
             arr[bit] = 1
     return arr.tolist()
+
+def _erg_single(smiles_or_mol):
+    """ErG (Extended Reduced Graph) — pharmacophore-pair fingerprint with fuzzy binning."""
+    mol = _ensure_mol(smiles_or_mol)
+    from rdkit.Chem import rdReducedGraphs
+    fp = rdReducedGraphs.GetErGFingerprint(mol)
+    return fp.tolist()
+
+def _get_pharm2d_factory():
+    if "pharm2d_factory" not in _cache:
+        import os
+        from rdkit import RDConfig
+        from rdkit.Chem import ChemicalFeatures
+        from rdkit.Chem.Pharm2D.SigFactory import SigFactory
+        fdef = os.path.join(RDConfig.RDDataDir, "BaseFeatures.fdef")
+        feat_factory = ChemicalFeatures.BuildFeatureFactory(fdef)
+        sig_factory = SigFactory(feat_factory, minPointCount=2, maxPointCount=3)
+        sig_factory.SetBins([(0, 2), (2, 5), (5, 8)])
+        sig_factory.Init()
+        _cache["pharm2d_factory"] = sig_factory
+    return _cache["pharm2d_factory"]
+
+def _pharmacophore_single(smiles_or_mol):
+    """2D Pharmacophore fingerprint — 2- and 3-point pharmacophore tuples."""
+    mol = _ensure_mol(smiles_or_mol)
+    from rdkit.Chem.Pharm2D import Generate
+    factory = _get_pharm2d_factory()
+    fp = Generate.Gen2DFingerprint(mol, factory)
+    n = fp.GetNumBits()
+    return [int(fp[i]) for i in range(n)]
+
+def _layered_single(smiles_or_mol, n_bits=2048):
+    """Layered fingerprint — multiple property layers (atom types, bond types, rings, etc.)."""
+    mol = _ensure_mol(smiles_or_mol)
+    fp = Chem.LayeredFingerprint(mol, fpSize=n_bits)
+    arr = np.zeros(n_bits, dtype=np.int32)
+    DataStructs.ConvertToNumpyArray(fp, arr)
+    return arr.tolist()
+
+def _pattern_single(smiles_or_mol, n_bits=2048):
+    """Pattern fingerprint — optimized for substructure screening."""
+    mol = _ensure_mol(smiles_or_mol)
+    fp = Chem.PatternFingerprint(mol, fpSize=n_bits)
+    arr = np.zeros(n_bits, dtype=np.int32)
+    DataStructs.ConvertToNumpyArray(fp, arr)
+    return arr.tolist()
+
+def _e3fp_single(smiles_or_mol, n_bits=1024):
+    """E3FP (Extended 3D Fingerprint) — 3D circular substructure fingerprint."""
+    mol = _ensure_mol(smiles_or_mol)
+    smi = Chem.MolToSmiles(mol)
+    try:
+        from e3fp.pipeline import fprints_from_smiles
+    except ImportError:
+        raise ImportError(
+            "e3fp is required for E3FP fingerprint. "
+            "Install it with: pip install e3fp"
+        )
+    import logging
+    logging.getLogger("e3fp").setLevel(logging.WARNING)
+    fprint_params = {"bits": n_bits, "radius_multiplier": 1.5, "rdkit_invariants": True}
+    fprints = fprints_from_smiles(smi, smi, fprint_params=fprint_params, confgen_params={"num_conf": 1})
+    arr = np.zeros(n_bits, dtype=np.int32)
+    if fprints:
+        for bit in fprints[0].indices:
+            if 0 <= bit < n_bits:
+                arr[bit] = 1
+    return arr.tolist()
+
+def _mqn_single(smiles_or_mol):
+    """MQN (Molecular Quantum Numbers) — 42 integer descriptors."""
+    mol = _ensure_mol(smiles_or_mol)
+    return list(rdMolDescriptors.MQNs_(mol))
+
+def _ghose_crippen_single(smiles_or_mol):
+    """Ghose-Crippen — SlogP_VSA + SMR_VSA + PEOE_VSA descriptors (36 floats)."""
+    mol = _ensure_mol(smiles_or_mol)
+    slogp = list(rdMolDescriptors.SlogP_VSA_(mol))
+    smr = list(rdMolDescriptors.SMR_VSA_(mol))
+    peoe = list(rdMolDescriptors.PEOE_VSA_(mol))
+    return slogp + smr + peoe
+
+def _bcut2d_single(smiles_or_mol):
+    """BCUT2D — Burden eigenvalues weighted by mass, charge, logP, MR (8 floats)."""
+    mol = _ensure_mol(smiles_or_mol)
+    try:
+        return list(rdMolDescriptors.BCUT2D(mol))
+    except Exception:
+        return [0.0] * 8
+
+_SHED_MAP = {
+    "Donor": "D", "Acceptor": "A",
+    "PosIonizable": "P", "NegIonizable": "N",
+    "Hydrophobe": "H", "LumpedHydrophobe": "H",
+    "Aromatic": "R",
+}
+_SHED_TYPES = ["D", "A", "P", "N", "H", "R", "X"]
+_SHED_PAIRS = []
+for _i, _t1 in enumerate(_SHED_TYPES):
+    for _t2 in _SHED_TYPES[_i:]:
+        _SHED_PAIRS.append((_t1, _t2))
+
+def _get_shed_factory():
+    if "shed_factory" not in _cache:
+        import os
+        from rdkit import RDConfig
+        from rdkit.Chem import ChemicalFeatures
+        fdef = os.path.join(RDConfig.RDDataDir, "BaseFeatures.fdef")
+        _cache["shed_factory"] = ChemicalFeatures.BuildFeatureFactory(fdef)
+    return _cache["shed_factory"]
+
+def _shed_single(smiles_or_mol):
+    """SHED (Shannon Entropy Descriptors) — 28 pharmacophore-pair distance entropy values."""
+    mol = _ensure_mol(smiles_or_mol)
+    import math
+    from collections import defaultdict
+    factory = _get_shed_factory()
+    feats = factory.GetFeaturesForMol(mol)
+    atom_types = {}
+    for feat in feats:
+        shed_type = _SHED_MAP.get(feat.GetFamily())
+        if shed_type:
+            for idx in feat.GetAtomIds():
+                if idx not in atom_types:
+                    atom_types[idx] = set()
+                atom_types[idx].add(shed_type)
+    n_atoms = mol.GetNumAtoms()
+    for i in range(n_atoms):
+        if i not in atom_types:
+            atom_types[i] = {"X"}
+    dm = Chem.GetDistanceMatrix(mol)
+    pair_dists = defaultdict(list)
+    for i in range(n_atoms):
+        for j in range(i + 1, n_atoms):
+            d = int(dm[i][j])
+            for t1 in atom_types[i]:
+                for t2 in atom_types[j]:
+                    pair_dists[tuple(sorted([t1, t2]))].append(d)
+    result = []
+    for pair in _SHED_PAIRS:
+        dists = pair_dists.get(tuple(sorted(pair)), [])
+        if not dists:
+            result.append(0.0)
+            continue
+        counts = defaultdict(int)
+        for d in dists:
+            counts[d] += 1
+        total = len(dists)
+        entropy = 0.0
+        for c in counts.values():
+            p = c / total
+            if p > 0:
+                entropy -= p * math.log2(p)
+        result.append(entropy)
+    return result
+
+def _functional_groups_single(smiles_or_mol):
+    """Functional Groups — 85 RDKit fragment descriptors as count vector."""
+    mol = _ensure_mol(smiles_or_mol)
+    from rdkit.Chem import Fragments
+    fns = sorted([f for f in dir(Fragments) if f.startswith("fr_")])
+    return [getattr(Fragments, f)(mol) for f in fns]
+
+_FG_SIZE = 85  # len(sorted([f for f in dir(Fragments) if f.startswith("fr_")]))
+
+def _physiochemical_single(smiles_or_mol):
+    """Physiochemical Properties — key RDKit 2D molecular descriptors."""
+    mol = _ensure_mol(smiles_or_mol)
+    result = []
+    for func in _get_descriptor_funcs():
+        try:
+            v = func(mol) if func is not None else 0.0
+            result.append(float(v) if v is not None else 0.0)
+        except Exception:
+            result.append(0.0)
+    return result
+
+def _cats2d_single(smiles_or_mol):
+    """CATS2D (Chemically Advanced Template Search) — 2-point pharmacophore correlation vector."""
+    mol = _ensure_mol(smiles_or_mol)
+    from rdkit.Chem.Pharm2D import Generate
+    factory = _get_cats2d_factory()
+    fp = Generate.Gen2DFingerprint(mol, factory)
+    n = fp.GetNumBits()
+    return [int(fp[i]) for i in range(n)]
+
+def _get_cats2d_factory():
+    if "cats2d_factory" not in _cache:
+        import os
+        from rdkit import RDConfig
+        from rdkit.Chem import ChemicalFeatures
+        from rdkit.Chem.Pharm2D.SigFactory import SigFactory
+        fdef = os.path.join(RDConfig.RDDataDir, "BaseFeatures.fdef")
+        feat_factory = ChemicalFeatures.BuildFeatureFactory(fdef)
+        sig_factory = SigFactory(feat_factory, minPointCount=2, maxPointCount=2)
+        sig_factory.SetBins([(i, i + 1) for i in range(10)])
+        sig_factory.Init()
+        _cache["cats2d_factory"] = sig_factory
+    return _cache["cats2d_factory"]
+
+def _mordred_single(smiles_or_mol):
+    """Mordred — 1613 2D molecular descriptors."""
+    mol = _ensure_mol(smiles_or_mol)
+    try:
+        from mordred import Calculator, descriptors as mordred_desc
+    except ImportError:
+        raise ImportError(
+            "mordred is required for Mordred descriptors. "
+            "Install it with: pip install mordredcommunity "
+            "(the original 'mordred' package is unmaintained and fails on current numpy)"
+        )
+    calc = _get_mordred_calc()
+    result = calc(mol)
+    out = []
+    for v in result:
+        if v is None or hasattr(v, "error"):
+            out.append(0.0)
+        else:
+            f = float(v)
+            out.append(f if np.isfinite(f) else 0.0)
+    return out
+
+def _get_mordred_calc():
+    if "mordred_calc" not in _cache:
+        from mordred import Calculator, descriptors as mordred_desc
+        _cache["mordred_calc"] = Calculator(mordred_desc, ignore_3D=True)
+    return _cache["mordred_calc"]
+
+def _rdkit2d_single(smiles_or_mol):
+    """RDKit 2D Descriptors — 210 RDKit descriptors in a fixed order (see _rdkit_descriptors)."""
+    mol = _ensure_mol(smiles_or_mol)
+    result = []
+    for func in _get_descriptor_funcs():
+        try:
+            v = func(mol) if func is not None else 0.0
+            f = float(v) if v is not None else 0.0
+            result.append(f if np.isfinite(f) else 0.0)
+        except Exception:
+            result.append(0.0)
+    return result
+
+def _secfp_single(smiles_or_mol, n_bits=2048, radius=3, min_radius=1):
+    """SECFP (SMILES Extended Connectivity Fingerprint).
+
+    Like ECFP but hashes canonical SMILES of circular substructures instead of
+    Morgan invariants. Includes ring membership. Default radius=3 gives SECFP6.
+    """
+    mol = _ensure_mol(smiles_or_mol)
+    gen = rdFingerprintGenerator.GetMorganGenerator(radius=radius)
+    ao = rdFingerprintGenerator.AdditionalOutput()
+    ao.AllocateBitInfoMap()
+    gen.GetFingerprint(mol, additionalOutput=ao)
+    info = ao.GetBitInfoMap()
+    arr = np.zeros(n_bits, dtype=np.int32)
+    ring_info = mol.GetRingInfo()
+    for bit, envs in info.items():
+        for atom_idx, r in envs:
+            if r < min_radius:
+                continue
+            env = Chem.FindAtomEnvironmentOfRadiusN(mol, r, atom_idx)
+            if env:
+                submol = Chem.PathToSubmol(mol, env)
+                smi = Chem.MolToSmiles(submol)
+                center_in_ring = ring_info.NumAtomRings(atom_idx)
+                key = f"{smi}|r{center_in_ring}"
+            else:
+                key = mol.GetAtomWithIdx(atom_idx).GetSymbol()
+            arr[_stable_hash(key) % n_bits] = 1
+    return arr.tolist()
+
 
 def _multihash_fold_count(sparse_fp, n_bits, n_hashes=2):
     """Multi-hash fold for count fingerprints."""
@@ -338,15 +670,15 @@ def _estate_single(smiles_or_mol):
 def _atompairs2d_single(smiles_or_mol, n_bits=780, collision_free=False):
     mol = _ensure_mol(smiles_or_mol)
     if collision_free:
-        return _multihash_fold(rdMolDescriptors.GetAtomPairFingerprint(mol), n_bits)
-    fp = rdMolDescriptors.GetHashedAtomPairFingerprintAsBitVect(mol, nBits=n_bits)
+        return _multihash_fold(_atompair_gen().GetSparseCountFingerprint(mol), n_bits)
+    fp = _atompair_gen(n_bits, count_simulation=True).GetFingerprint(mol)
     return [int(fp[i]) for i in range(n_bits)]
 
 def _atompairs2d_count_single(smiles_or_mol, n_bits=780, collision_free=False):
     mol = _ensure_mol(smiles_or_mol)
     if collision_free:
-        return _multihash_fold_count(rdMolDescriptors.GetAtomPairFingerprint(mol), n_bits)
-    fp = rdMolDescriptors.GetHashedAtomPairFingerprint(mol, nBits=n_bits)
+        return _multihash_fold_count(_atompair_gen().GetSparseCountFingerprint(mol), n_bits)
+    fp = _atompair_gen(n_bits).GetCountFingerprint(mol)
     result = [0] * n_bits
     for idx, count in fp.GetNonzeroElements().items():
         if 0 <= idx < n_bits:
@@ -528,20 +860,16 @@ def _atompairs3d_single(smiles_or_mol, n_bits=780, collision_free=False):
     mol = _ensure_mol(smiles_or_mol)
     mol = _ensure_conformer(mol)
     if collision_free:
-        return _multihash_fold(rdMolDescriptors.GetAtomPairFingerprint(mol, use2D=False), n_bits)
-    fp = rdMolDescriptors.GetHashedAtomPairFingerprintAsBitVect(
-        mol, nBits=n_bits, use2D=False
-    )
+        return _multihash_fold(_atompair_gen(use_2d=False).GetSparseCountFingerprint(mol), n_bits)
+    fp = _atompair_gen(n_bits, use_2d=False, count_simulation=True).GetFingerprint(mol)
     return [int(fp[i]) for i in range(n_bits)]
 
 def _atompairs3d_count_single(smiles_or_mol, n_bits=780, collision_free=False):
     mol = _ensure_mol(smiles_or_mol)
     mol = _ensure_conformer(mol)
     if collision_free:
-        return _multihash_fold_count(rdMolDescriptors.GetAtomPairFingerprint(mol, use2D=False), n_bits)
-    fp = rdMolDescriptors.GetHashedAtomPairFingerprint(
-        mol, nBits=n_bits, use2D=False
-    )
+        return _multihash_fold_count(_atompair_gen(use_2d=False).GetSparseCountFingerprint(mol), n_bits)
+    fp = _atompair_gen(n_bits, use_2d=False).GetCountFingerprint(mol)
     result = [0] * n_bits
     for idx, count in fp.GetNonzeroElements().items():
         if 0 <= idx < n_bits:
@@ -719,6 +1047,66 @@ def map4(input_data, *, n_bits=1024, column=None, n_jobs=1, sparse=False):
 def map4c(input_data, *, n_bits=1024, column=None, n_jobs=1, sparse=False):
     """MAP4C (MinHashed Atom Pair Chiral) — stereochemistry-aware MAP4. Requires: pip install mapchiral"""
     return _versatile(_map4c_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits)
+
+def secfp(input_data, *, n_bits=2048, column=None, n_jobs=1, sparse=False):
+    """SECFP (SMILES Extended Connectivity Fingerprint) — SMILES-based circular FP with ring info."""
+    return _versatile(_secfp_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits)
+
+def erg(input_data, *, column=None, n_jobs=1, sparse=False):
+    """ErG (Extended Reduced Graph) — pharmacophore-pair fingerprint (315 floats)."""
+    return _versatile(_erg_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse)
+
+def pharmacophore(input_data, *, column=None, n_jobs=1, sparse=False):
+    """2D Pharmacophore fingerprint (2988 bits) — 2- and 3-point pharmacophore tuples with topological distances."""
+    return _versatile(_pharmacophore_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse)
+
+def layered(input_data, *, n_bits=2048, column=None, n_jobs=1, sparse=False):
+    """Layered fingerprint (2048 bits) — encodes atom types, bond types, ring membership across multiple layers."""
+    return _versatile(_layered_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits)
+
+def pattern(input_data, *, n_bits=2048, column=None, n_jobs=1, sparse=False):
+    """Pattern fingerprint (2048 bits) — optimized for substructure screening."""
+    return _versatile(_pattern_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits)
+
+def e3fp(input_data, *, n_bits=1024, column=None, n_jobs=1, sparse=False):
+    """E3FP (Extended 3D Fingerprint) — 3D circular substructures. Requires: pip install e3fp"""
+    return _versatile(_e3fp_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse, n_bits=n_bits)
+
+def mqn(input_data, *, column=None, n_jobs=1, sparse=False):
+    """MQN (Molecular Quantum Numbers) — 42 integer descriptors covering atom/bond/polarity counts."""
+    return _versatile(_mqn_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse)
+
+def ghose_crippen(input_data, *, column=None, n_jobs=1, sparse=False):
+    """Ghose-Crippen (36 floats) — SlogP_VSA + SMR_VSA + PEOE_VSA lipophilicity/refractivity descriptors."""
+    return _versatile(_ghose_crippen_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse)
+
+def bcut2d(input_data, *, column=None, n_jobs=1, sparse=False):
+    """BCUT2D (8 floats) — Burden eigenvalues weighted by atomic mass, charge, logP, and molar refractivity."""
+    return _versatile(_bcut2d_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse)
+
+def shed(input_data, *, column=None, n_jobs=1, sparse=False):
+    """SHED (28 floats) — Shannon Entropy Descriptors of pharmacophore-pair topological distance distributions."""
+    return _versatile(_shed_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse)
+
+def functional_groups(input_data, *, column=None, n_jobs=1, sparse=False):
+    """Functional Groups (85 counts) — RDKit fragment descriptor counts for 85 functional group types."""
+    return _versatile(_functional_groups_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse)
+
+def physiochemical(input_data, *, column=None, n_jobs=1, sparse=False):
+    """Physiochemical Properties (210 floats) — all RDKit 2D physicochemical descriptors."""
+    return _versatile(_physiochemical_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse)
+
+def cats2d(input_data, *, column=None, n_jobs=1, sparse=False):
+    """CATS2D (360 bits) — Chemically Advanced Template Search 2-point pharmacophore correlation vector."""
+    return _versatile(_cats2d_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse)
+
+def mordred(input_data, *, column=None, n_jobs=1, sparse=False):
+    """Mordred (1613 floats) — comprehensive 2D molecular descriptors. Requires: pip install mordredcommunity"""
+    return _versatile(_mordred_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse)
+
+def rdkit2d(input_data, *, column=None, n_jobs=1, sparse=False):
+    """RDKit 2D Descriptors (210 floats) — all RDKit topological descriptors."""
+    return _versatile(_rdkit2d_single, input_data, column=column, n_jobs=n_jobs, sparse=sparse)
 
 def atompairs3d(input_data, *, n_bits=780, collision_free=False, column=None, n_jobs=1, sparse=False):
     """3D Atom Pairs fingerprint (780 bits). Use collision_free=True for multi-hash."""
@@ -902,6 +1290,21 @@ FINGERPRINTS = {
     "mhfp": (_mhfp_single, 1024, "MHFP (MinHashed Fingerprint)"),
     "map4": (_map4_single, 1024, "MAP4 (MinHashed Atom Pair r=2)"),
     "map4c": (_map4c_single, 1024, "MAP4C (MinHashed Atom Pair Chiral)"),
+    "secfp": (_secfp_single, 2048, "SECFP (SMILES Extended Connectivity)"),
+    "erg": (_erg_single, 315, "ErG (Extended Reduced Graph)"),
+    "pharmacophore": (_pharmacophore_single, 2988, "2D Pharmacophore (2+3-point)"),
+    "layered": (_layered_single, 2048, "Layered (multi-property layers)"),
+    "pattern": (_pattern_single, 2048, "Pattern (substructure screening)"),
+    "e3fp": (_e3fp_single, 1024, "E3FP (Extended 3D Fingerprint)"),
+    "mqn": (_mqn_single, 42, "MQN (Molecular Quantum Numbers)"),
+    "ghose_crippen": (_ghose_crippen_single, 36, "Ghose-Crippen (SlogP/SMR/PEOE VSA)"),
+    "bcut2d": (_bcut2d_single, 8, "BCUT2D (Burden eigenvalues)"),
+    "shed": (_shed_single, 28, "SHED (Shannon Entropy Descriptors)"),
+    "functional_groups": (_functional_groups_single, 85, "Functional Groups (85 RDKit fragments)"),
+    "physiochemical": (_physiochemical_single, 210, "Physiochemical Properties (RDKit 2D)"),
+    "cats2d": (_cats2d_single, 360, "CATS2D (pharmacophore correlation)"),
+    "mordred": (_mordred_single, 1613, "Mordred (2D descriptors)"),
+    "rdkit2d": (_rdkit2d_single, 210, "RDKit 2D Descriptors"),
     "atompairs3d": (_atompairs3d_single, 780, "3D Atom Pairs"),
     "atompairs3d_count": (_atompairs3d_count_single, 780, "3D Atom Pairs Count"),
     "usr": (_usr_single, 12, "Ultrafast Shape Recognition"),
